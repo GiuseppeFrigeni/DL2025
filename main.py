@@ -75,10 +75,11 @@ def main(args):
     hidden_dim = 64
     output_dim = 6  # Number of classes
     num_epochs = 10  # Number of epochs for training
+    lr = 0.001  # Learning rate
 
     # Initialize the model, optimizer, and loss criterion
     model = SimpleGCN(input_dim, hidden_dim, output_dim).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Prepare test dataset and loader
