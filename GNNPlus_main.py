@@ -5,6 +5,7 @@ import logging
 import argparse
 from loadData import GraphDataset
 from torch_geometric.loader import DataLoader
+import pandas as pd
 
 import GNNPlus  # noqa, register custom modules
 from GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
@@ -117,6 +118,20 @@ def main(args):
             train_acc, _ = evaluate(train_loader, calculate_accuracy=True)
             print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
+    # Evaluate and save test predictions
+    predictions = evaluate(test_loader, calculate_accuracy=False)
+    test_graph_ids = list(range(len(predictions)))
+
+    # Save predictions to CSV
+    test_dir_name = os.path.dirname(args.test_path).split(os.sep)[-1]
+    output_csv_path = os.path.join(f"testset_{test_dir_name}.csv")
+    output_df = pd.DataFrame({
+        "GraphID": test_graph_ids,
+        "Class": predictions
+    })
+    output_df.to_csv(output_csv_path, index=False)
+    print(f"Test predictions saved to {output_csv_path}")
+    
     return 0
 
 if __name__ == "__main__":    
