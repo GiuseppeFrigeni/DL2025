@@ -4,7 +4,7 @@ import torch
 import logging
 import argparse
 from loadData import GraphDataset
-
+from torch_geometric.loader import DataLoader
 
 import GNNPlus  # noqa, register custom modules
 from GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
@@ -16,7 +16,7 @@ from torch_geometric.graphgym.logger import set_printing
 from torch_geometric.graphgym.optim import create_optimizer, \
     create_scheduler, OptimizerConfig
 from torch_geometric.graphgym.model_builder import create_model
-from torch_geometric.graphgym.train import GraphGymDataModule, train
+from torch_geometric.graphgym.train import GraphGymDataModule
 from torch_geometric.graphgym.utils.comp_budget import params_count
 from torch_geometric.graphgym.utils.device import auto_select_device
 from torch_geometric.graphgym.register import train_dict
@@ -29,6 +29,43 @@ from GNNPlus.logger import create_logger
 torch.backends.cuda.matmul.allow_tf32 = True  # Default False in PyTorch 1.12+
 torch.backends.cudnn.allow_tf32 = True  # Default True
 
+def add_zeros(data):
+    data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
+    return data
+
+
+def train(data_loader):
+    model.train()
+    total_loss = 0
+    for data in data_loader:
+        data = data.to(device)
+        optimizer.zero_grad()
+        output = model(data)
+        loss = criterion(output, data.y)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    return total_loss / len(data_loader)
+
+
+def evaluate(data_loader, calculate_accuracy=False):
+    model.eval()
+    correct = 0
+    total = 0
+    predictions = []
+    with torch.no_grad():
+        for data in data_loader:
+            data = data.to(device)
+            output = model(data)
+            pred = output.argmax(dim=1)
+            predictions.extend(pred.cpu().numpy())
+            if calculate_accuracy:
+                correct += (pred == data.y).sum().item()
+                total += data.y.size(0)
+    if calculate_accuracy:
+        accuracy = correct / total
+        return accuracy, predictions
+    return predictions
 
 def new_optimizer_config(cfg):
     return OptimizerConfig(optimizer=cfg.optim.optimizer,
@@ -47,18 +84,38 @@ def new_scheduler_config(cfg):
         train_mode=cfg.train.mode, eval_period=cfg.train.eval_period)
 
 def main(args):
+    global model, optimizer, criterion, device
+    num_epochs = 10  # Number of epochs for training
+    lr = 0.001  # Learning rate
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # Model import
     cfg = os.path.join('/configs/gatedgcn/ppa.yaml')
     set_cfg(cfg)
     load_cfg(cfg)
     set_printing()
-    model = create_model()
-    optimizer = create_optimizer(model.parameters(), new_optimizer_config(cfg))
-    scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
+    model = create_model().to(device)
     cfg.params = params_count(model)
     logging.info('Num parameters: %s', cfg.params)
 
 
+    optimizer = create_optimizer(model.parameters(), new_optimizer_config(cfg))
+    scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
+    criterion = torch.nn.CrossEntropyLoss()
 
+     # Prepare test dataset and loader
+    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    if args.train_path:
+        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+        # Training loop
+        for epoch in range(num_epochs):
+            train_loss = train(train_loader)
+            train_acc, _ = evaluate(train_loader, calculate_accuracy=True)
+            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
     return 0
 
