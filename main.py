@@ -74,6 +74,7 @@ def main(args):
     input_dim = 300  # Example input feature dimension (you can adjust this)
     hidden_dim = 64
     output_dim = 6  # Number of classes
+    num_epochs = 10  # Number of epochs for training
 
     # Initialize the model, optimizer, and loss criterion
     model = SimpleGCN(input_dim, hidden_dim, output_dim).to(device)
@@ -90,7 +91,7 @@ def main(args):
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
         # Training loop
-        num_epochs = 2
+        
         for epoch in range(num_epochs):
             train_loss = train(train_loader)
             train_acc, _ = evaluate(train_loader, calculate_accuracy=True)
