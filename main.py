@@ -6,7 +6,6 @@ from loadData import GraphDataset
 import os
 import pandas as pd
 
-
 def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
     return data
@@ -113,7 +112,7 @@ def main(args):
     print(f"Test predictions saved to {output_csv_path}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     parser = argparse.ArgumentParser(description="Train and evaluate a GCN model on graph datasets.")
     parser.add_argument("--train_path", type=str, default=None, help="Path to the training dataset (optional).")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
