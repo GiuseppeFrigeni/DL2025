@@ -118,11 +118,6 @@ class SimpleGCN(torch.nn.Module):
         x_pooled = global_mean_pool(x, batch) # `batch` vector from DataLoader is crucial
         return x_pooled # Logits for graph classification
 
-    
-
-def add_zeros(data):
-    data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
-    return data
 
 
 def train(data_loader, model, optimizer, criterion, device):
@@ -233,7 +228,7 @@ def main(args):
                 print(f"Removed previous checkpoint: {filePath}")
 
         subset_size_desired = 100 
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
+        train_dataset = GraphDataset(args.train_path)
         indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
         train_subset = Subset(train_dataset, indices_for_subset)
         labels = []
@@ -316,7 +311,7 @@ def main(args):
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
-    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
+    test_dataset = GraphDataset(args.test_path)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     # Evaluate and save test predictions
