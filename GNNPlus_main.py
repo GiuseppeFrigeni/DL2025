@@ -259,6 +259,7 @@ def main(args):
         train_dataset = GraphDataset(args.train_path, transform=my_transform)
         indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
         train_subset = Subset(train_dataset, indices_for_subset)
+        
         labels = []
         for i in range(len(train_subset)):
             labels.append(train_subset[i].y.item()) # .item() if y is a 0-dim tensor
@@ -269,7 +270,7 @@ def main(args):
         print(f"Min label: {min(labels)}, Max label: {max(labels)}")
 
         all_labels_in_training_set = label_counts # List of all labels in your training data
-        unique_classes_in_train = np.array(sorted(list(set(all_labels_in_training_set))))
+        unique_classes_in_train = np.arange(NUM_CLASSES) # Assuming classes are 0 to NUM_CLASSES-1
         if len(unique_classes_in_train) == NUM_CLASSES:
             class_weights_values = compute_class_weight('balanced', classes=unique_classes_in_train, y=np.array(all_labels_in_training_set))
             class_weights_tensor = torch.tensor(class_weights_values, dtype=torch.float).to(device)
