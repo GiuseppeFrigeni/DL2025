@@ -5,8 +5,8 @@ from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.models.gnn import FeatureEncoder, GNNPreMP
 from torch_geometric.graphgym.register import register_network
 
-from GNNPlus.layer.gatedgcn_layer import GatedGCNLayer
-from GNNPlus.layer.gine_conv_layer import GINEConvLayer
+from source.GNNPlus.layer.gatedgcn_layer import GatedGCNLayer
+from source.GNNPlus.layer.gine_conv_layer import GINEConvLayer
 
 @register_network('custom_gnn')
 class CustomGNN(torch.nn.Module):
