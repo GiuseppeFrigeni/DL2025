@@ -58,6 +58,68 @@ def plot_training_progress(train_losses, train_accuracies, output_dir):
     plt.savefig(os.path.join(output_dir, "training_progress.png"))
     plt.close()
 
+      
+import torch
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv
+
+class SimpleGCN(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, dropout_rate=0.2): # Reduced dropout for small data
+        super().__init__()
+        # If no node features (in_channels=0 or None), use an embedding for nodes
+        # For now, assuming in_channels > 0 (actual node features)
+        if in_channels <= 0: # Handle case with no initial features by using node degree or an embedding
+            print("Warning: in_channels <=0. Consider using node embeddings or degrees as features.")
+            # As a placeholder, let's assume we'll create a dummy feature if none.
+            # This part needs to be adapted to your actual data.
+            # If you have node degrees, that's a common GCN starting point.
+            # Or you can create learnable embeddings per node if num_nodes is fixed,
+            # but that's tricky for graph-batched data unless it's within the forward.
+            # For simplicity, let's assume you will provide some `data.x`.
+            # If not, this model needs adjustment.
+            self.uses_dummy_features = True # Flag this
+            self.dummy_feature_dim = hidden_channels # Create dummy features of this size
+            self.conv1 = GCNConv(self.dummy_feature_dim, hidden_channels)
+        else:
+            self.uses_dummy_features = False
+            self.conv1 = GCNConv(in_channels, hidden_channels)
+
+        self.conv2 = GCNConv(hidden_channels, out_channels)
+        self.dropout_rate = dropout_rate
+
+    def forward(self, data): # PyG convention often passes the whole Data object
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+
+        if self.uses_dummy_features and x is None:
+            # Create dummy features if no 'x' and configured to do so.
+            # This is a basic way; a learnable embedding per node would be better
+            # if node identities are consistent and meaningful across graphs.
+            # For now, let's use a constant feature for all nodes if x is missing.
+            # This isn't ideal but makes the GCN runnable.
+            # A better approach for no features is to use torch.eye(data.num_nodes)
+            # but that's for single graphs, not batches easily.
+            # Or use node degrees.
+            # For now, let's just illustrate the GCN structure.
+            # YOU WILL LIKELY NEED TO ADJUST FEATURE HANDLING HERE.
+            # Example: x = torch.ones((data.num_nodes, self.dummy_feature_dim), device=edge_index.device)
+            pass # This part highly depends on how you want to handle no features
+
+        if x is None:
+            raise ValueError("Node features 'x' are None. The model needs node features or specific handling for featureless graphs.")
+
+
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, p=self.dropout_rate, training=self.training)
+        x = self.conv2(x, edge_index)
+
+        # If graph classification, add pooling:
+        from torch_geometric.nn import global_mean_pool # Or global_add_pool, etc.
+        x_pooled = global_mean_pool(x, batch) # `batch` vector from DataLoader is crucial
+        return x_pooled # Logits for graph classification
+
+    
+
 def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
     return data
@@ -147,6 +209,8 @@ def main(args):
     logging.info('Num parameters: %s', cfg.params)
     print("gnn dropout: ", cfg.gnn.dropout)
 
+    
+
 
     device = torch.device(device)
 
@@ -176,19 +240,42 @@ def main(args):
         for i in range(len(train_subset)):
             labels.append(train_subset[i].y.item()) # .item() if y is a 0-dim tensor
 
-        import collections
-        label_counts = collections.Counter(labels)
-        print(f"Label distribution for the subset of {len(train_subset)} elements: {label_counts}")
-        print(f"Min label: {min(labels)}, Max label: {max(labels)}")
+        
+        if len(train_subset) > 0:
+            sample_data = train_subset[0]
+            if sample_data.x is not None:
+                IN_CHANNELS = sample_data.x.size(1)
+                print(f"Determined IN_CHANNELS from data: {IN_CHANNELS}")
+            else:
+                print("ERROR: sample_data.x is None! Cannot determine IN_CHANNELS.")
+                print("You need to provide node features or use a transform to create them.")
+                IN_CHANNELS = -1 # Placeholder, will cause error
+        else:
+            print("ERROR: subset_dataset is empty!")
+            IN_CHANNELS = -1 # Placeholder
 
-        train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
+        HIDDEN_CHANNELS = 64 # Example, tune this
+        NUM_CLASSES = 6    # For your subset
+        LEARNING_RATE = 1e-3
+        EPOCHS = 50 # Increase for the small subset
+        WEIGHT_DECAY = 1e-4 # Add some regularization
+
+        model = SimpleGCN(in_channels=IN_CHANNELS,
+                      hidden_channels=HIDDEN_CHANNELS,
+                      out_channels=NUM_CLASSES).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
+
+
+
+        train_loader = DataLoader(train_subset, batch_size=16, shuffle=True)
         
         best_accuracy = 0.0
         train_losses = []
         train_accuracies = []
 
         # Training loop
-        for epoch in range(num_epochs):
+        for epoch in range(EPOCHS):
                 
             train_loss = train(train_loader, model, optimizer, criterion, device)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
