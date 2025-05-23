@@ -141,7 +141,7 @@ def train(data_loader, model, optimizer, criterion, device):
     for data in data_loader:
         data = data.to(device)
         optimizer.zero_grad()
-        output = model(data)[0]  # Assuming model returns a tuple
+        output = model(data)  # Assuming model returns a tuple
         loss = criterion(output, data.y)
         loss.backward()
         optimizer.step()
@@ -158,7 +158,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
     with torch.no_grad():
         for data in data_loader:
             data = data.to(device)
-            output = model(data)[0]  # Assuming model returns a tuple
+            output = model(data)  # Assuming model returns a tuple
             pred = output.argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
@@ -252,31 +252,8 @@ def main(args):
             labels.append(train_subset[i].y.item()) # .item() if y is a 0-dim tensor
 
         
-        if len(train_subset) > 0:
-            sample_data = train_subset[0]
-            if sample_data.x is not None:
-                print(f"sample_data.x: {sample_data.x}")
-                print(f"sample_data.x.shape: {sample_data.x.shape}")
-                print(f"sample_data.x.dim(): {sample_data.x.dim()}")
-
-            if sample_data.x.dim() == 1:
-                print("ERROR: sample_data.x is 1-dimensional. Reshaping to [num_nodes, 1].")
-                # This assumes that if it's 1D, it's [num_nodes] and each node has 1 feature.
-                # This is a common case if you used degree() without unsqueeze().
-                sample_data.x = sample_data.x.unsqueeze(1)
-                print(f"Reshaped sample_data.x.shape: {sample_data.x.shape}")
     
-            # Now it should be 2D
-            if sample_data.x.dim() == 2:
-                IN_CHANNELS = sample_data.x.size(1)
-                print(f"Determined IN_CHANNELS from data: {IN_CHANNELS}")
-            else:
-                print(f"ERROR: sample_data.x has unexpected dimension: {sample_data.x.dim()}")
-                IN_CHANNELS = -1 # Error state
-        else:
-            print("ERROR: subset_dataset is empty!")
-            IN_CHANNELS = -1 # Placeholder
-
+        IN_CHANNELS = 1
         HIDDEN_CHANNELS = 64 # Example, tune this
         NUM_CLASSES = 6    # For your subset
         LEARNING_RATE = 1e-3
