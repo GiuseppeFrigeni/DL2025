@@ -8,26 +8,24 @@ from torch_geometric.loader import DataLoader
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-import shutil
 import source.GNNPlus  # noqa, register custom modules
 from source.GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
 
 #from torch_geometric.graphgym.cmd_args import parse_args
 from torch_geometric.graphgym.config import (cfg, set_cfg, load_cfg)
-from torch_geometric.graphgym.loader import create_loader
+#from torch_geometric.graphgym.loader import create_loader
 from torch_geometric.graphgym.logger import set_printing
 from torch_geometric.graphgym.optim import create_optimizer, \
     create_scheduler, OptimizerConfig
 from torch_geometric.graphgym.model_builder import create_model
-from torch_geometric.graphgym.train import GraphGymDataModule
+#from torch_geometric.graphgym.train import GraphGymDataModule
 from torch_geometric.graphgym.utils.comp_budget import params_count
-from torch_geometric.graphgym.utils.device import auto_select_device
-from torch_geometric.graphgym.register import train_dict
+#from torch_geometric.graphgym.utils.device import auto_select_device
+#from torch_geometric.graphgym.register import train_dict
 from torch_geometric import seed_everything
 
-from source.GNNPlus.finetuning import load_pretrained_model_cfg, \
-    init_model_from_pretrained
-from source.GNNPlus.logger import create_logger
+#from source.GNNPlus.finetuning import load_pretrained_model_cfg, init_model_from_pretrained
+#from source.GNNPlus.logger import create_logger
 
 torch.backends.cuda.matmul.allow_tf32 = True  # Default False in PyTorch 1.12+
 torch.backends.cudnn.allow_tf32 = True  # Default True
@@ -181,7 +179,7 @@ def main(args):
             train_loss = train(train_loader, model, optimizer, criterion, device)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             scheduler.step()
-            
+
             # Save logs for training progress
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
