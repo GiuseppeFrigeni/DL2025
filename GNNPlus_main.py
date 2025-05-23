@@ -58,6 +58,21 @@ def plot_training_progress(train_losses, train_accuracies, output_dir):
     plt.savefig(os.path.join(output_dir, "training_progress.png"))
     plt.close()
 
+from torch_geometric.transforms import BaseTransform
+from torch_geometric.utils import degree
+
+class AddDegreeFeatures(BaseTransform): # Renamed for clarity
+    def __call__(self, data):
+        if data.num_nodes > 0:
+            if hasattr(data, 'edge_index') and data.edge_index is not None and data.edge_index.numel() > 0:
+                node_degrees = degree(data.edge_index[0], num_nodes=data.num_nodes, dtype=torch.float)
+            else:
+                node_degrees = torch.zeros(data.num_nodes, dtype=torch.float)
+            data.x = node_degrees.unsqueeze(1) # Shape [num_nodes, 1]
+        else:
+            data.x = torch.empty(0, 1, dtype=torch.float) # Shape [0, 1] for 0-node graphs
+        return data
+
       
 import torch
 import torch.nn.functional as F
@@ -204,7 +219,8 @@ def main(args):
     logging.info('Num parameters: %s', cfg.params)
     print("gnn dropout: ", cfg.gnn.dropout)
 
-    
+    #transfrm
+    my_transform = AddDegreeFeatures()
 
 
     device = torch.device(device)
@@ -228,7 +244,7 @@ def main(args):
                 print(f"Removed previous checkpoint: {filePath}")
 
         subset_size_desired = 100 
-        train_dataset = GraphDataset(args.train_path)
+        train_dataset = GraphDataset(args.train_path, transform=my_transform)
         indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
         train_subset = Subset(train_dataset, indices_for_subset)
         labels = []
