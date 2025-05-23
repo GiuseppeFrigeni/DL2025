@@ -130,7 +130,7 @@ def main(args):
 
     seed_everything(42)  # Set random seed for reproducibility
 
-    os.makedirs(os.getcwd()+'/submission', exist_ok=True)
+    os.makedirs(os.getcwd().join('submission'), exist_ok=True)
 
     # Model import
     set_cfg(cfg)
