@@ -58,7 +58,7 @@ def evaluate(data_loader, calculate_accuracy=False):
         for data in data_loader:
             data = data.to(device)
             output = model(data)
-            pred = output.argmax(dim=1)
+            pred = output[0].argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
                 correct += (pred == data.y).sum().item()
@@ -114,7 +114,7 @@ def main(args):
     data = next(iter(test_loader))  # Preload the first batch to avoid lazy loading
     data = data.to(device)
     output = model(data)
-    #print(f"Output shape: {output.shape}")  # Check the output shape
+    print(f"Output shape: {output[0].shape}")  # Check the output shape
     print(f"Output: {output}")  # Check the output values
 
     if args.train_path:
