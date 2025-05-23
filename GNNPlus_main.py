@@ -221,7 +221,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_path", type=str, default=None, help="Path to the training dataset (optional).")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
     #simulating what parse_args from graphgym does
-    parser.add_argument('--cfg', dest='cfg_file', type=str,required=False, default=os.getcwd()+'/source/DL2025/configs/gatedgcn/ppa.yaml')
+    parser.add_argument('--cfg', dest='cfg_file', type=str,required=False, default=os.getcwd()+'/DL2025/source/configs/gatedgcn/ppa.yaml')
     parser.add_argument('--repeat', type=int, default=1, help='The number of repeated jobs.')
     parser.add_argument('--mark_done', action='store_true',help='Mark yaml as done after a job has finished.')
     parser.add_argument('opts', default=None, nargs=argparse.REMAINDER, help='See graphgym/config.py for remaining options.')
