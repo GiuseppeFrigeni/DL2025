@@ -88,13 +88,15 @@ def main(args):
     global model, optimizer, criterion, device
     num_epochs = 10  # Number of epochs for training
     lr = 0.001  # Learning rate
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
 
     # Model import
     set_cfg(cfg)
     load_cfg(cfg, args)
     set_printing()
-    model = create_model().to(device)
+    cfg.accelerator = device
+    model = create_model()
     cfg.params = params_count(model)
     logging.info('Num parameters: %s', cfg.params)
 
