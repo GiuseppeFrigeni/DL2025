@@ -65,7 +65,7 @@ def train(data_loader, model, optimizer, criterion, device):
     for data in tqdm(data_loader, desc="Iterating training graphs", unit="batch"):
         data = data.to(device)
         optimizer.zero_grad()
-        output = model(data)
+        output = model(data)[0]  # Assuming model returns a tuple
         loss = criterion(output, data.y)
         loss.backward()
         optimizer.step()
@@ -82,7 +82,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
     with torch.no_grad():
         for data in tqdm(data_loader, desc="Iterating eval graphs", unit="batch"):
             data = data.to(device)
-            output = model(data)
+            output = model(data)[0]  # Assuming model returns a tuple
             pred = output.argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
@@ -150,12 +150,6 @@ def main(args):
      # Prepare test dataset and loader
     test_dataset = GraphDataset(args.test_path, transform=add_zeros)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-
-    data = next(iter(test_loader))  # Preload the first batch to avoid lazy loading
-    data = data.to(device)
-    output = model(data)
-    print(f"Output shape: {output[0].shape}")  # Check the output shape
-    print(f"Output: {output}")  # Check the output values
 
 
     if args.train_path:
