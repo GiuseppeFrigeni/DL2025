@@ -14,15 +14,15 @@ from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.loader import load_pyg, load_ogb, set_dataset_attr
 from torch_geometric.graphgym.register import register_loader
 
-from GNNPlus.loader.dataset.aqsol_molecules import AQSOL
-from GNNPlus.loader.dataset.coco_superpixels import COCOSuperpixels
-from GNNPlus.loader.dataset.malnet_tiny import MalNetTiny
-from GNNPlus.loader.dataset.voc_superpixels import VOCSuperpixels
-from GNNPlus.loader.split_generator import (prepare_splits,
+from .dataset.aqsol_molecules import AQSOL
+from .dataset.coco_superpixels import COCOSuperpixels
+from .dataset.malnet_tiny import MalNetTiny
+from .dataset.voc_superpixels import VOCSuperpixels
+from .split_generator import (prepare_splits,
                                              set_dataset_splits)
-from GNNPlus.transform.posenc_stats import compute_posenc_stats
-from GNNPlus.transform.task_preprocessing import task_specific_preprocessing
-from GNNPlus.transform.transforms import (pre_transform_in_memory,
+from source.GNNPlus.transform.posenc_stats import compute_posenc_stats
+from source.GNNPlus.transform.task_preprocessing import task_specific_preprocessing
+from source.GNNPlus.transform.transforms import (pre_transform_in_memory,
                                            typecast_x, concat_x_and_pos,
                                            clip_graphs_to_size)
 
