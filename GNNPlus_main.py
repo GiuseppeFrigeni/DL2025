@@ -242,6 +242,13 @@ def main(args):
 
     if args.train_path:
 
+        IN_CHANNELS = 1
+        HIDDEN_CHANNELS = 64 # Example, tune this
+        NUM_CLASSES = 6    # For your subset
+        LEARNING_RATE = 1e-3
+        EPOCHS = 50 # Increase for the small subset
+        WEIGHT_DECAY = 1e-4 # Add some regularization
+
         # Remove previous checkpoints for the same test dataset
         for filePath in os.listdir(checkpoints_folder):
             if test_dir_name in filePath:
@@ -271,12 +278,7 @@ def main(args):
             class_weights_tensor = torch.ones(NUM_CLASSES, dtype=torch.float).to(device) # Fallback
         
     
-        IN_CHANNELS = 1
-        HIDDEN_CHANNELS = 64 # Example, tune this
-        NUM_CLASSES = 6    # For your subset
-        LEARNING_RATE = 1e-3
-        EPOCHS = 50 # Increase for the small subset
-        WEIGHT_DECAY = 1e-4 # Add some regularization
+        
 
         model = SimpleGCN(in_channels=IN_CHANNELS,
                       hidden_channels=HIDDEN_CHANNELS,
