@@ -22,7 +22,7 @@ from torch_geometric.graphgym.utils.comp_budget import params_count
 from torch_geometric.graphgym.utils.device import auto_select_device
 from torch_geometric.graphgym.register import train_dict
 from torch_geometric import seed_everything
-
+import argparse
 from GNNPlus.finetuning import load_pretrained_model_cfg, \
     init_model_from_pretrained
 from GNNPlus.logger import create_logger
@@ -91,9 +91,11 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Model import
-    cfg = os.path.join('/configs/gatedgcn/ppa.yaml')
-    #set_cfg(cfg)
-    load_cfg(cfg)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cfg', type=str, default='configs/gatedgcn/ppa.yaml',)
+    args = parser.parse_args()
+    set_cfg(cfg)
+    load_cfg(cfg, args)
     set_printing()
     model = create_model().to(device)
     cfg.params = params_count(model)
