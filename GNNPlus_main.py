@@ -116,7 +116,7 @@ def new_scheduler_config(cfg):
 
 def main(args):
     num_epochs = 20  # Number of epochs for training
-    lr = 1e-4  # Learning rate
+    lr = 1e-3  # Learning rate
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -157,6 +157,8 @@ def main(args):
     beta_val = 0.0
     criterion = SCELoss(alpha=alpha_val, beta=beta_val, num_classes=6, reduction='mean')
 
+    
+
 
     if args.train_path:
 
@@ -170,7 +172,14 @@ def main(args):
         train_dataset = GraphDataset(args.train_path, transform=add_zeros)
         indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
         train_subset = Subset(train_dataset, indices_for_subset)
+        labels = []
+        for i in range(len(train_subset)):
+            labels.append(train_subset[i].y.item()) # .item() if y is a 0-dim tensor
 
+        import collections
+        label_counts = collections.Counter(labels)
+        print(f"Label distribution for the subset of {len(train_subset)} elements: {label_counts}")
+        print(f"Min label: {min(labels)}, Max label: {max(labels)}")
 
         train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
         
