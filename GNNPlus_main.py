@@ -13,6 +13,10 @@ from source.GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
 from source.loss import SCELoss
 from torch import optim
 
+from sklearn.utils.class_weight import compute_class_weight
+import numpy as np
+
+
 from torch.utils.data import Subset
 
 #from torch_geometric.graphgym.cmd_args import parse_args
@@ -135,14 +139,14 @@ class SimpleGCN(torch.nn.Module):
 
 
 
-def train(data_loader, model, optimizer, criterion, device):
+def train(data_loader, model, optimizer, criterion, device, class_weights):
     model.train()
     total_loss = 0
     for data in data_loader:
         data = data.to(device)
         optimizer.zero_grad()
         output = model(data)  # Assuming model returns a tuple
-        loss = criterion(output, data.y)
+        loss = criterion(output, data.y, class_weights=class_weights)
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
@@ -230,7 +234,7 @@ def main(args):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
 
     alpha_val = 1.0
-    beta_val = 0.0
+    beta_val = 1.0
     criterion = SCELoss(alpha=alpha_val, beta=beta_val, num_classes=6, reduction='mean')
 
     
@@ -256,6 +260,15 @@ def main(args):
         label_counts = collections.Counter(labels)
         print(f"Label distribution for the subset of {len(train_subset)} elements: {label_counts}")
         print(f"Min label: {min(labels)}, Max label: {max(labels)}")
+
+        all_labels_in_training_set = label_counts # List of all labels in your training data
+        unique_classes_in_train = np.array(sorted(list(set(all_labels_in_training_set))))
+        if len(unique_classes_in_train) == NUM_CLASSES:
+            class_weights_values = compute_class_weight('balanced', classes=unique_classes_in_train, y=np.array(all_labels_in_training_set))
+            class_weights_tensor = torch.tensor(class_weights_values, dtype=torch.float).to(device)
+        else:
+            print("Warning: Mismatch in expected vs. found classes. Using uniform weights for SCE.")
+            class_weights_tensor = torch.ones(NUM_CLASSES, dtype=torch.float).to(device) # Fallback
         
     
         IN_CHANNELS = 1
@@ -269,8 +282,8 @@ def main(args):
                       hidden_channels=HIDDEN_CHANNELS,
                       out_channels=NUM_CLASSES).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-        criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
-
+        #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
+        criterion = SCELoss(alpha=1.0, beta=0.5, num_classes=NUM_CLASSES, reduction='mean')
 
 
         train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
@@ -282,7 +295,7 @@ def main(args):
         # Training loop
         for epoch in range(EPOCHS):
                 
-            train_loss = train(train_loader, model, optimizer, criterion, device)
+            train_loss = train(train_loader, model, optimizer, criterion, device, class_weights=class_weights_tensor )
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
 
             # Save logs for training progress
