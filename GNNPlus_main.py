@@ -115,7 +115,7 @@ def new_scheduler_config(cfg):
         train_mode=cfg.train.mode, eval_period=cfg.train.eval_period)
 
 def main(args):
-    num_epochs = 20  # Number of epochs for training
+    num_epochs = 30  # Number of epochs for training
     lr = 1e-3  # Learning rate
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
