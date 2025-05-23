@@ -91,9 +91,6 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Model import
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, default='configs/gatedgcn/ppa.yaml',)
-    args = parser.parse_args()
     set_cfg(cfg)
     load_cfg(cfg, args)
     set_printing()
@@ -140,5 +137,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate a GCN model on graph datasets.")
     parser.add_argument("--train_path", type=str, default=None, help="Path to the training dataset (optional).")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+    parser.add_argument('--cfg', type=str,required=False, default='configs/gatedgcn/ppa.yaml',)
     args = parser.parse_args()
     main(args)
