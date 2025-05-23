@@ -3,17 +3,17 @@ from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.models.encoder import AtomEncoder, BondEncoder
 from torch_geometric.graphgym.register import register_node_encoder, register_edge_encoder
 
-from GNNPlus.encoder.ast_encoder import ASTNodeEncoder
-from GNNPlus.encoder.kernel_pos_encoder import RWSENodeEncoder, \
+from .ast_encoder import ASTNodeEncoder
+from .kernel_pos_encoder import RWSENodeEncoder, \
     HKdiagSENodeEncoder, ElstaticSENodeEncoder
-from GNNPlus.encoder.laplace_pos_encoder import LapPENodeEncoder
-from GNNPlus.encoder.ppa_encoder import PPANodeEncoder
-from GNNPlus.encoder.signnet_pos_encoder import SignNetNodeEncoder
-from GNNPlus.encoder.voc_superpixels_encoder import VOCNodeEncoder, COCONodeEncoder
-from GNNPlus.encoder.type_dict_encoder import TypeDictNodeEncoder, TypeDictEdgeEncoder
-from GNNPlus.encoder.linear_node_encoder import LinearNodeEncoder
-from GNNPlus.encoder.equivstable_laplace_pos_encoder import EquivStableLapPENodeEncoder
-from GNNPlus.encoder.graphormer_encoder import GraphormerEncoder
+from .laplace_pos_encoder import LapPENodeEncoder
+from .ppa_encoder import PPANodeEncoder
+from .signnet_pos_encoder import SignNetNodeEncoder
+from .voc_superpixels_encoder import VOCNodeEncoder, COCONodeEncoder
+from .type_dict_encoder import TypeDictNodeEncoder, TypeDictEdgeEncoder
+from .linear_node_encoder import LinearNodeEncoder
+from .equivstable_laplace_pos_encoder import EquivStableLapPENodeEncoder
+from .graphormer_encoder import GraphormerEncoder
 
 
 def concat_node_encoders(encoder_classes, pe_enc_names):
