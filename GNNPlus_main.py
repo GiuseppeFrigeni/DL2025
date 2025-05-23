@@ -151,7 +151,7 @@ def main(args):
     device = torch.device(device)
 
     
-    optimizer = optim.AdanW(model.parameters(), lr=lr, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
 
     alpha_val = 1.0
     beta_val = 0.0
