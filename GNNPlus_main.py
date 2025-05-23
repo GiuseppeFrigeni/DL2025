@@ -243,7 +243,7 @@ def main(args):
                 os.remove(filePath)
                 print(f"Removed previous checkpoint: {filePath}")
 
-        subset_size_desired = 100 
+        subset_size_desired = 1000
         train_dataset = GraphDataset(args.train_path, transform=my_transform)
         indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
         train_subset = Subset(train_dataset, indices_for_subset)
@@ -251,6 +251,10 @@ def main(args):
         for i in range(len(train_subset)):
             labels.append(train_subset[i].y.item()) # .item() if y is a 0-dim tensor
 
+        import collections
+        label_counts = collections.Counter(labels)
+        print(f"Label distribution for the subset of {len(train_subset)} elements: {label_counts}")
+        print(f"Min label: {min(labels)}, Max label: {max(labels)}")
         
     
         IN_CHANNELS = 1
@@ -268,7 +272,7 @@ def main(args):
 
 
 
-        train_loader = DataLoader(train_subset, batch_size=16, shuffle=True)
+        train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
         
         best_accuracy = 0.0
         train_losses = []
