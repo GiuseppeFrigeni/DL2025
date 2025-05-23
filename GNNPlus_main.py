@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import source.GNNPlus  # noqa, register custom modules
 from source.GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
+from source.loss import SCELoss
 
 #from torch_geometric.graphgym.cmd_args import parse_args
 from torch_geometric.graphgym.config import (cfg, set_cfg, load_cfg)
@@ -88,6 +89,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
             if calculate_accuracy:
                 correct += (pred == data.y).sum().item()
                 total += data.y.size(0)
+            
     if calculate_accuracy:
         accuracy = correct / total
         return accuracy, predictions
@@ -147,7 +149,10 @@ def main(args):
     
     optimizer = create_optimizer(model.parameters(), new_optimizer_config(cfg))
     scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
-    criterion = torch.nn.CrossEntropyLoss()
+
+    alpha_val = 1.0
+    beta_val = 1.0
+    criterion = SCELoss(alpha=alpha_val, beta=beta_val, num_classes=6, reduction='mean')
 
 
     if args.train_path:
