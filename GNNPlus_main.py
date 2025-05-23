@@ -147,10 +147,6 @@ def main(args):
     scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
     criterion = torch.nn.CrossEntropyLoss()
 
-     # Prepare test dataset and loader
-    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-
 
     if args.train_path:
 
@@ -195,6 +191,10 @@ def main(args):
     model = create_model()
     model.load_state_dict(best_model_state_dict)
 
+     # Prepare test dataset and loader
+    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    
     # Evaluate and save test predictions
     predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
     test_graph_ids = list(range(len(predictions)))
