@@ -112,7 +112,7 @@ def new_scheduler_config(cfg):
         train_mode=cfg.train.mode, eval_period=cfg.train.eval_period)
 
 def main(args):
-    num_epochs = 10  # Number of epochs for training
+    num_epochs = 20  # Number of epochs for training
     lr = 3e-4  # Learning rate
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -183,7 +183,7 @@ def main(args):
             train_accuracies.append(train_acc)
 
             print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % 5 == 0:
                 logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
                 # Save best model
