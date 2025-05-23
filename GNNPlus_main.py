@@ -195,7 +195,7 @@ def main(args):
     test_dir_name = os.path.basename(os.path.dirname(args.test_path))
 
     # Define log file path relative to the script's directory
-    logs_folder = os.path.join(script_dir, "logs", test_dir_name)
+    logs_folder = os.path.join(os.getcwd(), "logs", test_dir_name)
     log_file = os.path.join(logs_folder, "training.log")
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
     logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
