@@ -202,12 +202,13 @@ def main(args):
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
     # Define checkpoint path relative to the script's directory
-    checkpoints_folder = os.path.join(script_dir, "checkpoints", test_dir_name)
+    checkpoints_folder = os.path.join(os.getcwd(), "checkpoints", test_dir_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
     seed_everything(42)  # Set random seed for reproducibility
 
-    os.makedirs(os.getcwd().join('submission'), exist_ok=True)
+    submission_dir = os.path.join(os.getcwd(), 'submission')
+    os.makedirs(submission_dir, exist_ok=True)
 
     # Model import
     set_cfg(cfg)
