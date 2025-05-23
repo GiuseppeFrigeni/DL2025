@@ -90,7 +90,6 @@ def main(args):
     lr = 0.001  # Learning rate
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-
     # Model import
     set_cfg(cfg)
     load_cfg(cfg, args)
@@ -99,8 +98,12 @@ def main(args):
     model = create_model()
     cfg.params = params_count(model)
     logging.info('Num parameters: %s', cfg.params)
+    logging.info(model)
+    logging.info(cfg)
 
-
+    device = torch.device(device)
+    
+    
     optimizer = create_optimizer(model.parameters(), new_optimizer_config(cfg))
     scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
     criterion = torch.nn.CrossEntropyLoss()
@@ -108,6 +111,12 @@ def main(args):
      # Prepare test dataset and loader
     test_dataset = GraphDataset(args.test_path, transform=add_zeros)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    data = next(iter(test_loader))  # Preload the first batch to avoid lazy loading
+    data = data.to(device)
+    output = model(data)
+    print(f"Output shape: {output.shape}")  # Check the output shape
+    print(f"Output: {output}")  # Check the output values
 
     if args.train_path:
         train_dataset = GraphDataset(args.train_path, transform=add_zeros)
