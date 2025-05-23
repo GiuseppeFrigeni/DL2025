@@ -65,16 +65,19 @@ def plot_training_progress(train_losses, train_accuracies, output_dir):
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import degree
 
-class AddDegreeFeatures(BaseTransform): # Renamed for clarity
+class AddDegreeSquaredFeatures(BaseTransform):
     def __call__(self, data):
         if data.num_nodes > 0:
             if hasattr(data, 'edge_index') and data.edge_index is not None and data.edge_index.numel() > 0:
-                node_degrees = degree(data.edge_index[0], num_nodes=data.num_nodes, dtype=torch.float)
+                deg = degree(data.edge_index[0], num_nodes=data.num_nodes, dtype=torch.float)
             else:
-                node_degrees = torch.zeros(data.num_nodes, dtype=torch.float)
-            data.x = node_degrees.unsqueeze(1) # Shape [num_nodes, 1]
+                deg = torch.zeros(data.num_nodes, dtype=torch.float)
+            deg_sq = deg**2
+            # Normalize if scales are very different, though for deg and deg^2 it might be okay
+            # For instance, you could standardize each channel later across the whole dataset
+            data.x = torch.stack([deg, deg_sq], dim=-1) # Shape [num_nodes, 2]
         else:
-            data.x = torch.empty(0, 1, dtype=torch.float) # Shape [0, 1] for 0-node graphs
+            data.x = torch.empty(0, 2, dtype=torch.float)
         return data
 
       
@@ -225,7 +228,7 @@ def main(args):
     print("gnn dropout: ", cfg.gnn.dropout)
 
     #transfrm
-    my_transform = AddDegreeFeatures()
+    my_transform = AddDegreeSquaredFeatures()
 
 
     device = torch.device(device)
@@ -269,10 +272,10 @@ def main(args):
         print(f"Label distribution for the subset of {len(train_subset)} elements: {label_counts}")
         print(f"Min label: {min(labels)}, Max label: {max(labels)}")
 
-        all_labels_in_training_set = label_counts # List of all labels in your training data
+        all_labels_in_training_set = []
+        for label, count in label_counts.items():
+            all_labels_in_training_set.extend([label] * count)
         unique_classes_in_train = np.arange(NUM_CLASSES) # Assuming classes are 0 to NUM_CLASSES-1
-        print(f"Unique classes in training set: {unique_classes_in_train}")
-        print(f"All labels in training set: {all_labels_in_training_set[:10]}")
         if len(unique_classes_in_train) == NUM_CLASSES:
             class_weights_values = compute_class_weight('balanced', classes=unique_classes_in_train, y=np.array(all_labels_in_training_set))
             class_weights_tensor = torch.tensor(class_weights_values, dtype=torch.float).to(device)
