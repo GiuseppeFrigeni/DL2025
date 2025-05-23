@@ -62,7 +62,7 @@ def add_zeros(data):
 def train(data_loader, model, optimizer, criterion, device):
     model.train()
     total_loss = 0
-    for data in tqdm(data_loader, desc="Iterating training graphs", unit="batch"):
+    for data in data_loader:
         data = data.to(device)
         optimizer.zero_grad()
         output = model(data)[0]  # Assuming model returns a tuple
@@ -80,7 +80,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
     total = 0
     predictions = []
     with torch.no_grad():
-        for data in tqdm(data_loader, desc="Iterating eval graphs", unit="batch"):
+        for data in data_loader:
             data = data.to(device)
             output = model(data)[0]  # Assuming model returns a tuple
             pred = output.argmax(dim=1)
@@ -167,24 +167,30 @@ def main(args):
         train_accuracies = []
 
         # Training loop
-        for epoch in tqdm(range(num_epochs) , desc="Training", unit="epoch"):
-            train_loss = train(train_loader, model, optimizer, criterion, device)
-            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            scheduler.step()
+        with tqdm(range(num_epochs), unit='epoch') as tepoch:
+            for epoch in tepoch:
+                tepoch.set_description(f"Epoch {epoch + 1}")
+                
 
-            # Save logs for training progress
-            train_losses.append(train_loss)
-            train_accuracies.append(train_acc)
+                train_loss = train(train_loader, model, optimizer, criterion, device)
+                train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+                scheduler.step()
 
-            if (epoch + 1) % 10 == 0:
-                logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+                # Save logs for training progress
+                train_losses.append(train_loss)
+                train_accuracies.append(train_acc)
 
-            # Save best model
-            if train_acc > best_accuracy:
-                best_accuracy = train_acc
-                checkpoint_path = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_epoch_{epoch+1}.pth")
-                torch.save(model.state_dict(), checkpoint_path)
-                print(f"Best model updated and saved at {checkpoint_path}")
+                if (epoch + 1) % 10 == 0:
+                    logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+
+                # Save best model
+                if train_acc > best_accuracy:
+                    best_accuracy = train_acc
+                    checkpoint_path = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_epoch_{epoch+1}.pth")
+                    torch.save(model.state_dict(), checkpoint_path)
+                    print(f"Best model updated and saved at {checkpoint_path}")
+
+                tepoch.set_postfix(loss=train_loss, acc=train_acc)
 
 
 
