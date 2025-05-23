@@ -99,7 +99,6 @@ def main(args):
     cfg.params = params_count(model)
     logging.info('Num parameters: %s', cfg.params)
     logging.info(model)
-    logging.info(cfg)
 
     device = torch.device(device)
     
@@ -115,7 +114,7 @@ def main(args):
     data = next(iter(test_loader))  # Preload the first batch to avoid lazy loading
     data = data.to(device)
     output = model(data)
-    print(f"Output shape: {output.shape}")  # Check the output shape
+    #print(f"Output shape: {output.shape}")  # Check the output shape
     print(f"Output: {output}")  # Check the output values
 
     if args.train_path:
