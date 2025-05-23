@@ -8,7 +8,7 @@ from torch_geometric.loader import DataLoader
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
+import shutil
 import source.GNNPlus  # noqa, register custom modules
 from source.GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
 
@@ -61,7 +61,7 @@ def add_zeros(data):
     return data
 
 
-def train(data_loader, model, optimizer, criterion, device, save_checkpoints, checkpoint_path, current_epoch):
+def train(data_loader, model, optimizer, criterion, device):
     model.train()
     total_loss = 0
     for data in tqdm(data_loader, desc="Iterating training graphs", unit="batch"):
@@ -72,12 +72,6 @@ def train(data_loader, model, optimizer, criterion, device, save_checkpoints, ch
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
-
-    # Save checkpoints if required
-    if save_checkpoints:
-        checkpoint_file = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
-        torch.save(model.state_dict(), checkpoint_file)
-        print(f"Checkpoint saved at {checkpoint_file}")
 
     return total_loss / len(data_loader)
 
@@ -165,28 +159,33 @@ def main(args):
     print(f"Output shape: {output[0].shape}")  # Check the output shape
     print(f"Output: {output}")  # Check the output values
 
-    if os.path.exists(checkpoint_path) and not args.train_path:
-        model.load_state_dict(torch.load(checkpoint_path))
-        print(f"Loaded best model from {checkpoint_path}")
 
     if args.train_path:
+
+        # Remove previous checkpoints for the same test dataset
+        for filePath in os.listdir(checkpoints_folder):
+            if test_dir_name in filePath:
+                os.remove(filePath)
+                print(f"Removed previous checkpoint: {filePath}")
+
         train_dataset = GraphDataset(args.train_path, transform=add_zeros)
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
-        # Training loop
+        
         best_accuracy = 0.0
         train_losses = []
         train_accuracies = []
 
         # Training loop
-        for epoch in range(num_epochs):
-            train_loss = train(train_loader, model, optimizer, criterion, device, save_checkpoints=True, checkpoint_path=checkpoint_path, current_epoch=epoch)
+        for epoch in tqdm(range(num_epochs) , desc="Training", unit="epoch"):
+            train_loss = train(train_loader, model, optimizer, criterion, device)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
-
+            scheduler.step()
+            
             # Save logs for training progress
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
+
             if (epoch + 1) % 10 == 0:
                 logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
@@ -198,8 +197,14 @@ def main(args):
                 print(f"Best model updated and saved at {checkpoint_path}")
 
 
+
+    epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
+    best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
+    model = create_model()
+    model.load_state_dict(best_model_state_dict)
+
     # Evaluate and save test predictions
-    predictions = evaluate(test_loader, calculate_accuracy=False)
+    predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
     test_graph_ids = list(range(len(predictions)))
 
     # Save predictions to CSV
