@@ -244,12 +244,24 @@ def main(args):
         if len(train_subset) > 0:
             sample_data = train_subset[0]
             if sample_data.x is not None:
+                print(f"sample_data.x: {sample_data.x}")
+                print(f"sample_data.x.shape: {sample_data.x.shape}")
+                print(f"sample_data.x.dim(): {sample_data.x.dim()}")
+
+            if sample_data.x.dim() == 1:
+                print("ERROR: sample_data.x is 1-dimensional. Reshaping to [num_nodes, 1].")
+                # This assumes that if it's 1D, it's [num_nodes] and each node has 1 feature.
+                # This is a common case if you used degree() without unsqueeze().
+                sample_data.x = sample_data.x.unsqueeze(1)
+                print(f"Reshaped sample_data.x.shape: {sample_data.x.shape}")
+    
+            # Now it should be 2D
+            if sample_data.x.dim() == 2:
                 IN_CHANNELS = sample_data.x.size(1)
                 print(f"Determined IN_CHANNELS from data: {IN_CHANNELS}")
             else:
-                print("ERROR: sample_data.x is None! Cannot determine IN_CHANNELS.")
-                print("You need to provide node features or use a transform to create them.")
-                IN_CHANNELS = -1 # Placeholder, will cause error
+                print(f"ERROR: sample_data.x has unexpected dimension: {sample_data.x.dim()}")
+                IN_CHANNELS = -1 # Error state
         else:
             print("ERROR: subset_dataset is empty!")
             IN_CHANNELS = -1 # Placeholder
