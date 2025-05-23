@@ -142,7 +142,6 @@ def main(args):
     model = create_model(dim_out=6)  # Assuming 6 classes for classification
     cfg.params = params_count(model)
     logging.info('Num parameters: %s', cfg.params)
-    logging.info(model)
 
     device = torch.device(device)
 
