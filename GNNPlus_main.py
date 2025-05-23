@@ -11,6 +11,9 @@ from tqdm import tqdm
 import source.GNNPlus  # noqa, register custom modules
 from source.GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
 from source.loss import SCELoss
+from torch import optim
+
+from torch.utils.data import Subset
 
 #from torch_geometric.graphgym.cmd_args import parse_args
 from torch_geometric.graphgym.config import (cfg, set_cfg, load_cfg)
@@ -113,7 +116,7 @@ def new_scheduler_config(cfg):
 
 def main(args):
     num_epochs = 20  # Number of epochs for training
-    lr = 3e-4  # Learning rate
+    lr = 1e-4  # Learning rate
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -142,15 +145,16 @@ def main(args):
     model = create_model(dim_out=6)  # Assuming 6 classes for classification
     cfg.params = params_count(model)
     logging.info('Num parameters: %s', cfg.params)
+    print("gnn dropout: ", cfg.gnn.dropout)
+
 
     device = torch.device(device)
 
     
-    optimizer = create_optimizer(model.parameters(), new_optimizer_config(cfg))
-    scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
+    optimizer = optim.AdanW(model.parameters(), lr=lr, weight_decay=1e-4)
 
     alpha_val = 1.0
-    beta_val = 1.0
+    beta_val = 0.0
     criterion = SCELoss(alpha=alpha_val, beta=beta_val, num_classes=6, reduction='mean')
 
 
@@ -162,9 +166,13 @@ def main(args):
                 os.remove(filePath)
                 print(f"Removed previous checkpoint: {filePath}")
 
+        subset_size_desired = 100 
         train_dataset = GraphDataset(args.train_path, transform=add_zeros)
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
+        train_subset = Subset(train_dataset, indices_for_subset)
 
+
+        train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
         
         best_accuracy = 0.0
         train_losses = []
@@ -175,7 +183,6 @@ def main(args):
                 
             train_loss = train(train_loader, model, optimizer, criterion, device)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            scheduler.step()
 
             # Save logs for training progress
             train_losses.append(train_loss)

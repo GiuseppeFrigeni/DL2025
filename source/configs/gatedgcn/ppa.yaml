@@ -34,7 +34,7 @@ gnn:
   dim_inner: 512 
   batchnorm: True
   act: relu
-  dropout: 0.15
+  dropout: 0.5
   agg: mean
   normalize_adj: False
   ffn: False
