@@ -92,7 +92,7 @@ def main(args):
 
     # Model import
     cfg = os.path.join('/configs/gatedgcn/ppa.yaml')
-    set_cfg(cfg)
+    #set_cfg(cfg)
     load_cfg(cfg)
     set_printing()
     model = create_model().to(device)
