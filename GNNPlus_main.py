@@ -110,7 +110,7 @@ def new_scheduler_config(cfg):
         train_mode=cfg.train.mode, eval_period=cfg.train.eval_period)
 
 def main(args):
-    num_epochs = 100  # Number of epochs for training
+    num_epochs = 10  # Number of epochs for training
     lr = 3e-4  # Learning rate
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -167,30 +167,27 @@ def main(args):
         train_accuracies = []
 
         # Training loop
-        with tqdm(range(num_epochs), unit='epoch') as tepoch:
-            for epoch in tepoch:
-                tepoch.set_description(f"Epoch {epoch + 1}")
+        for epoch in range(num_epochs):
                 
+            train_loss = train(train_loader, model, optimizer, criterion, device)
+            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+            scheduler.step()
 
-                train_loss = train(train_loader, model, optimizer, criterion, device)
-                train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-                scheduler.step()
+            # Save logs for training progress
+            train_losses.append(train_loss)
+            train_accuracies.append(train_acc)
 
-                # Save logs for training progress
-                train_losses.append(train_loss)
-                train_accuracies.append(train_acc)
-
-                if (epoch + 1) % 10 == 0:
-                    logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            if (epoch + 1) % 10 == 0:
+                logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
                 # Save best model
-                if train_acc > best_accuracy:
-                    best_accuracy = train_acc
-                    checkpoint_path = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_epoch_{epoch+1}.pth")
-                    torch.save(model.state_dict(), checkpoint_path)
-                    print(f"Best model updated and saved at {checkpoint_path}")
+            if train_acc > best_accuracy:
+                best_accuracy = train_acc
+                checkpoint_path = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_epoch_{epoch+1}.pth")
+                torch.save(model.state_dict(), checkpoint_path)
+                print(f"Best model updated and saved at {checkpoint_path}")
 
-                tepoch.set_postfix(loss=train_loss, acc=train_acc)
 
 
 
