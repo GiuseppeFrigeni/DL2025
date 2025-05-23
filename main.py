@@ -2,7 +2,7 @@ import argparse
 import torch
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GCNConv, global_mean_pool
-from loadData import GraphDataset
+from source.loadData import GraphDataset
 import os
 import pandas as pd
 
