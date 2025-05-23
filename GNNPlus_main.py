@@ -130,6 +130,8 @@ def main(args):
 
     seed_everything(42)  # Set random seed for reproducibility
 
+    os.makedirs(os.getcwd()+'/submission', exist_ok=True)
+
     # Model import
     set_cfg(cfg)
     load_cfg(cfg, args)
@@ -201,10 +203,10 @@ def main(args):
 
     # Save predictions to CSV
     test_dir_name = os.path.dirname(args.test_path).split(os.sep)[-1]
-    output_csv_path = os.path.join(f"testset_{test_dir_name}.csv")
+    output_csv_path = os.path.join(f"submission/testset_{test_dir_name}.csv")
     output_df = pd.DataFrame({
-        "GraphID": test_graph_ids,
-        "Class": predictions
+        "id": test_graph_ids,
+        "pred": predictions
     })
     output_df.to_csv(output_csv_path, index=False)
     print(f"Test predictions saved to {output_csv_path}")
