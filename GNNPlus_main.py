@@ -135,7 +135,7 @@ def main(args):
     load_cfg(cfg, args)
     set_printing()
     cfg.accelerator = device
-    model = create_model()
+    model = create_model(dim_out=6)  # Assuming 6 classes for classification
     cfg.params = params_count(model)
     logging.info('Num parameters: %s', cfg.params)
     logging.info(model)
@@ -194,7 +194,7 @@ def main(args):
      # Prepare test dataset and loader
     test_dataset = GraphDataset(args.test_path, transform=add_zeros)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-    
+
     # Evaluate and save test predictions
     predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
     test_graph_ids = list(range(len(predictions)))
