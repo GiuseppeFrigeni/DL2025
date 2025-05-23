@@ -188,7 +188,7 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
-    model = create_model()
+    model = create_model(dim_out=6)  # Assuming 6 classes for classification
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
