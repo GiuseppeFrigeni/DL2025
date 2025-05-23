@@ -137,7 +137,7 @@ def main(args):
     checkpoints_folder = os.path.join(script_dir, "checkpoints", test_dir_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
-
+    seed_everything(42)  # Set random seed for reproducibility
 
     # Model import
     set_cfg(cfg)
