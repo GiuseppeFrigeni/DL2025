@@ -6,6 +6,8 @@ import argparse
 from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 import pandas as pd
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 import source.GNNPlus  # noqa, register custom modules
 from source.GNNPlus.optimizer.extra_optimizers import ExtendedSchedulerConfig
@@ -30,15 +32,39 @@ from source.GNNPlus.logger import create_logger
 torch.backends.cuda.matmul.allow_tf32 = True  # Default False in PyTorch 1.12+
 torch.backends.cudnn.allow_tf32 = True  # Default True
 
+def plot_training_progress(train_losses, train_accuracies, output_dir):
+    epochs = range(1, len(train_losses) + 1)
+    plt.figure(figsize=(12, 6))
+
+    # Plot loss
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, train_losses, label="Training Loss", color='blue')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss per Epoch')
+
+    # Plot accuracy
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, train_accuracies, label="Training Accuracy", color='green')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Training Accuracy per Epoch')
+
+    # Save plots in the current directory
+    os.makedirs(output_dir, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "training_progress.png"))
+    plt.close()
+
 def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
     return data
 
 
-def train(data_loader):
+def train(data_loader, model, optimizer, criterion, device, save_checkpoints, checkpoint_path, current_epoch):
     model.train()
     total_loss = 0
-    for data in data_loader:
+    for data in tqdm(data_loader, desc="Iterating training graphs", unit="batch"):
         data = data.to(device)
         optimizer.zero_grad()
         output = model(data)
@@ -46,19 +72,26 @@ def train(data_loader):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+
+    # Save checkpoints if required
+    if save_checkpoints:
+        checkpoint_file = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
+        torch.save(model.state_dict(), checkpoint_file)
+        print(f"Checkpoint saved at {checkpoint_file}")
+
     return total_loss / len(data_loader)
 
 
-def evaluate(data_loader, calculate_accuracy=False):
+def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
     correct = 0
     total = 0
     predictions = []
     with torch.no_grad():
-        for data in data_loader:
+        for data in tqdm(data_loader, desc="Iterating eval graphs", unit="batch"):
             data = data.to(device)
             output = model(data)
-            pred = output[0].argmax(dim=1)
+            pred = output.argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
                 correct += (pred == data.y).sum().item()
@@ -85,11 +118,27 @@ def new_scheduler_config(cfg):
         train_mode=cfg.train.mode, eval_period=cfg.train.eval_period)
 
 def main(args):
-    global model, optimizer, criterion, device
     num_epochs = 10  # Number of epochs for training
     lr = 0.001  # Learning rate
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    test_dir_name = os.path.basename(os.path.dirname(args.test_path))
+
+    # Define log file path relative to the script's directory
+    logs_folder = os.path.join(script_dir, "logs", test_dir_name)
+    log_file = os.path.join(logs_folder, "training.log")
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+    logging.getLogger().addHandler(logging.StreamHandler()) 
+
+    # Define checkpoint path relative to the script's directory
+    checkpoint_path = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_best.pth")
+    checkpoints_folder = os.path.join(script_dir, "checkpoints", test_dir_name)
+    os.makedirs(checkpoints_folder, exist_ok=True)
+
+
+
     # Model import
     set_cfg(cfg)
     load_cfg(cfg, args)
@@ -101,7 +150,7 @@ def main(args):
     logging.info(model)
 
     device = torch.device(device)
-    
+
     
     optimizer = create_optimizer(model.parameters(), new_optimizer_config(cfg))
     scheduler = create_scheduler(optimizer, new_scheduler_config(cfg))
@@ -123,8 +172,8 @@ def main(args):
 
         # Training loop
         for epoch in range(num_epochs):
-            train_loss = train(train_loader)
-            train_acc, _ = evaluate(train_loader, calculate_accuracy=True)
+            train_loss = train(train_loader, model, optimizer, criterion, device, save_checkpoints=True, checkpoint_path=checkpoint_path, current_epoch=epoch)
+            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
     # Evaluate and save test predictions
@@ -141,7 +190,6 @@ def main(args):
     output_df.to_csv(output_csv_path, index=False)
     print(f"Test predictions saved to {output_csv_path}")
     
-    return 0
 
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser(description="Train and evaluate a GCN model on graph datasets.")
