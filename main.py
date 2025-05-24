@@ -133,8 +133,6 @@ def get_feature_statistics(dataset: Union[Dataset, List[Data]], batch_size: int 
 
         num_graphs += batch_data.num_graphs if hasattr(batch_data, 'num_graphs') else 1 # Handle single Data or Batch
 
-        if (i + 1) % 10 == 0:
-            print(f"  Processed { (i + 1) * batch_size if hasattr(batch_data, 'num_graphs') else (i+1)} graphs...")
 
     print(f"\n--- Dataset Overview ---")
     print(f"Total number of graphs: {num_graphs}") # This might be more accurately len(dataset) if not using loader on full dataset
@@ -301,6 +299,8 @@ def main(args):
 
 
         train_dataset = GraphDataset(args.train_path, transform=my_transform)
+        train_dataset.x[:,0] = (train_dataset.x[:,0] - train_dataset.x[:,0].mean()) / (train_dataset.x[:,0].std() + 1e-6) # Normalize degree
+        train_dataset.x[:,1] = (train_dataset.x[:,1] - train_dataset.x[:,1].mean()) / (train_dataset.x[:,1].std() + 1e-6) # Normalize degree squared
 
         node_feature_names = ["degree", "degree_squared"]
         edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names

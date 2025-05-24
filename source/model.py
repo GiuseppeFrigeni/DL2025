@@ -113,6 +113,11 @@ class GINEGraphClassifier(nn.Module):
             self.gine_layers.append(
                 GINEConv(nn=layer_nn, eps=eps, train_eps=train_eps, edge_dim=edge_in_channels)
             )
+
+            self.gine_layers.append(
+                nn.BatchNorm1d(hidden_channels) 
+            )
+
             current_dim = hidden_channels # Output of GINE is hidden_channels
 
         self.gine_output_dim = current_dim # Dimension before pooling
@@ -130,6 +135,7 @@ class GINEGraphClassifier(nn.Module):
         # Classifier MLP
         self.mlp = nn.Sequential(
             nn.Linear(self.gine_output_dim, hidden_channels // 2 if hidden_channels // 2 > 0 else 1),
+            nn.BatchNorm1d(hidden_channels // 2 if hidden_channels // 2 > 0 else 1),
             nn.ReLU(),
             nn.Dropout(p=dropout_mlp),
             nn.Linear(hidden_channels // 2 if hidden_channels // 2 > 0 else 1, out_channels)
