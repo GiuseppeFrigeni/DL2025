@@ -349,9 +349,9 @@ def main(args):
     my_transform = AddDegreeSquaredFeatures()
 
     NUM_CLASSES = 6    # For your subset
-    LEARNING_RATE = 5e-3
-    EPOCHS = 25 
-    WEIGHT_DECAY = 5e-4 # Add some regularization
+    LEARNING_RATE = 5e-4
+    EPOCHS = 100 
+    WEIGHT_DECAY = 1e-4 # Add some regularization
 
     HIDDEN_DIM = 64
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
