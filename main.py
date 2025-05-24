@@ -17,6 +17,7 @@ from typing import List, Union
 from source.loss import SCELoss
 from torch import optim
 from torch_geometric.transforms import BaseTransform
+from sklearn.model_selection import train_test_split
 
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
@@ -396,6 +397,7 @@ def main(args):
             if test_dataset is not None:
                 test_dataset.transform = normalizer
 
+        train_dataset, validation_dataset = train_test_split(train_dataset, test_size=0.2, random_state=42)
 
         #node_feature_names = ["degree", "degree_squared"]  # Assuming these are the features added by AddDegreeSquaredFeatures
         #edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names
@@ -439,24 +441,29 @@ def main(args):
 
 
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        vali_loader = DataLoader(validation_dataset, batch_size=32, shuffle=False)
         
         best_accuracy = 0.0
         train_losses = []
         train_accuracies = []
+        vali_accuracies = []
 
         # Training loop
         for epoch in range(EPOCHS):
                 
             train_loss = train(train_loader, model, optimizer, criterion, device)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+            
+            vali_acc, _ = evaluate(vali_loader, model, device, calculate_accuracy=True)
 
             # Save logs for training progress
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
+            vali_accuracies.append(vali_acc)
 
-            print(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            print(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {vali_acc:.4f}")
             if (epoch + 1) % 5 == 0:
-                logging.info(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+                logging.info(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {vali_acc:.4f}")
 
                 # Save best model
             if train_acc > best_accuracy:
