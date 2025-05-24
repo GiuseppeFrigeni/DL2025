@@ -31,6 +31,7 @@ class SCELoss(nn.Module):
         Returns:
             torch.Tensor: The calculated SCE loss.
         """
+        targets = targets.squeeze()  # Ensure targets are 1D (batch_size,)
         # --- 0. Determine sample_weights if class_weights are provided ---
         sample_weights: Optional[torch.Tensor] = None
         if class_weights is not None:
