@@ -467,7 +467,14 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
-    model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
+    model = GINEGraphClassifier(node_in_channels=NODE_IN_CHANNELS,
+                                   edge_in_channels=EDGE_IN_CHANNELS,
+                                   hidden_channels=HIDDEN_CHANNELS,
+                                   out_channels=NUM_CLASSES,
+                                   num_gine_layers=NUM_GINE_LAYERS,
+                                   dropout_gine=DROPOUT_GINE,
+                                   dropout_mlp=DROPOUT_MLP,
+                                   pooling_type=POOLING_TYPE).to(device)
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
