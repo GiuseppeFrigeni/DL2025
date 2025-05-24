@@ -28,7 +28,7 @@ class ProcessedGraphDataset(Dataset):
         self.raw_file_to_process_from = raw_filename
         if not os.path.exists(self.raw_file_to_process_from):
             raise FileNotFoundError(f"Raw data file: {self.raw_file_to_process_from}")
-        self.processed_file_suffix = raw_filename.split('.')[-2] 
+        self.processed_file_suffix = raw_filename.split('.')[-3] 
         self._dummy_raw_filename = f"dummy_raw_ref{self.processed_file_suffix}.source"
         super().__init__(root, transform, pre_transform, pre_filter, log)
 
