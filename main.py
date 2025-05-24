@@ -3,7 +3,7 @@ import datetime
 import torch
 import logging
 import argparse
-from source.loadData import ProcessedGraphDataset
+from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import AddDegreeSquaredFeatures
@@ -134,8 +134,7 @@ def main(args):
                 print(f"Removed previous checkpoint: {filePath}")
 
 
-        root_dir = os.path.join(os.getcwd(), 'cached_datasets', test_dir_name, 'train')
-        train_dataset = ProcessedGraphDataset(root=root_dir,raw_filename=args.train_path, transform=my_transform)
+        train_dataset = GraphDataset(args.train_path, transform=my_transform)
 
         labels = []
         for i in range(len(train_dataset)):
@@ -217,9 +216,8 @@ def main(args):
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
-    root_dir = os.path.join(os.getcwd(), 'cached_datasets', test_dir_name, 'test')
-    test_dataset = ProcessedGraphDataset(raw_filename=args.test_path, transform=my_transform, root=root_dir)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    test_dataset = GraphDataset(raw_filename=args.test_path, transform=my_transform)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     # Evaluate and save test predictions
     predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
