@@ -176,17 +176,16 @@ from torch_geometric.nn import GATConv
 from torch_geometric.data import Data
 
 class GATGraphClassifier(torch.nn.Module):
-    def __init__(self, node_feature_dim, embedding_dim, hidden_dim, out_channels,
+    def __init__(self, node_feature_dim, hidden_dim, out_channels,
                  edge_feature_dim, heads=8, dropout=0.6):
         super(GATGraphClassifier, self).__init__()
         self.node_feature_dim = node_feature_dim
-        self.embedding_dim = embedding_dim
         self.dropout = dropout
         self.heads = heads
 
 
-        self.conv1 = GATConv(node_feature_dim, hidden_dim, heads=heads, dropout=dropout)
-        self.conv2 = GATConv(hidden_dim * heads, hidden_dim, heads=1, dropout=dropout)
+        self.conv1 = GATConv(node_feature_dim, hidden_dim, heads=heads,edge_dim=edge_feature_dim, dropout=dropout)
+        self.conv2 = GATConv(hidden_dim * heads, hidden_dim, heads=1, edge_dim=edge_feature_dim, dropout=dropout)
 
         # Classifier MLP
         self.mlp = nn.Sequential(
