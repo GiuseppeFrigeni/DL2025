@@ -70,28 +70,44 @@ class ProcessedGraphDataset(Dataset):
         if self.pre_transform:
             data_list = [self.pre_transform(d) for d in tqdm(data_list, desc=f"PreTransform ({self.processed_file_suffix})", disable=not self.log) if d is not None]
         
-        if not data_list:
+        if not data_list: # Handle case where data_list becomes empty
             if self.log: print(f"Warning: Empty data_list for {self.processed_paths[0]}. Saving empty.")
-            # Create an empty Batch object and its slices
+            # Create an empty Batch object
             empty_batch = Batch.from_data_list([])
-            # For (data, slices) format, data is the Batch obj, slices is its __slices__ dict
-            torch.save((empty_batch, empty_batch.__slices__), self.processed_paths[0])
-            self._data, self.slices = empty_batch, empty_batch.__slices__
+            # Construct the slices dictionary for an empty batch
+            empty_slices = {key: torch.empty(0, dtype=torch.long) for key in empty_batch.keys}
+            # A more robust way for empty slices for PyG's expected `ptr` like structures
+            # For attributes like 'x', 'edge_index', slices often start with 0, e.g., tensor([0])
+            # For 'y' (graph labels), if empty, it would be an empty tensor for labels,
+            # and slices for y would also reflect that no items are present.
+            # Let's get the slice structure from an empty Batch object more directly for standard keys:
+            empty_slices_dict = {}
+            for key in empty_batch.keys: # Iterate common keys, or define expected keys
+                 empty_slices_dict[key] = empty_batch._get_slices(key) # Get actual slice for this key
+
+            torch.save((empty_batch, empty_slices_dict), self.processed_paths[0])
+            self._data, self.slices = empty_batch, empty_slices_dict
             return
 
-        # Collate using Batch.from_data_list()
+        # Collate the list of Data objects into a single Batch object
         collated_batch_object = Batch.from_data_list(data_list)
         
-        # The Batch object itself contains the concatenated data and the __slices__ attribute.
-        # We can save this tuple: (Batch_object_as_Data, its_slices_dictionary)
-        # This is what InMemoryDataset's collate effectively produces and saves.
-        data_to_save = collated_batch_object 
-        slices_to_save = collated_batch_object.__slices__ # Access internal slices
+        # Construct the slices dictionary.
+        # For each attribute in the collated_batch_object that is sliced (typically tensors),
+        # we need its slice tensor.
+        slices_dict_to_save = {}
+        for key in collated_batch_object.keys:
+            # The _get_slices method is an internal helper in Batch/Data to get the slice tensor for a key
+            # This tensor indicates the start/end points for each graph's data for that key
+            # in the concatenated tensor.
+            slices_dict_to_save[key] = collated_batch_object._get_slices(key)
+            
+        data_to_save = collated_batch_object # This is the Data object holding all concatenated tensors
 
-        torch.save((data_to_save, slices_to_save), self.processed_paths[0])
+        torch.save((data_to_save, slices_dict_to_save), self.processed_paths[0])
         
         if self.log: print(f"Saved {len(data_list)} graphs to {self.processed_paths[0]}")
-        self._data, self.slices = data_to_save, slices_to_save
+        self._data, self.slices = data_to_save, slices_dict_to_save
 
 
     def len(self):
