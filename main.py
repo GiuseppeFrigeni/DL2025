@@ -443,6 +443,7 @@ def main(args):
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
         vali_loader = DataLoader(validation_dataset, batch_size=32, shuffle=False)
         
+        print(next(iter(train_loader)))  # Check if DataLoader works   
         best_accuracy = 0.0
         train_losses = []
         train_accuracies = []
