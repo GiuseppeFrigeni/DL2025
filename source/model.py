@@ -58,68 +58,110 @@ class SimpleGCN(torch.nn.Module):
         return x_pooled # Logits for graph classification
 
 
-from torch_geometric.utils import remove_self_loops
-from torch_geometric.nn import MessagePassing
-from torch.nn import Linear
-from torch_geometric.nn import global_mean_pool
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GINEConv, global_mean_pool, global_add_pool, global_max_pool
+from torch_geometric.data import Data
+
+class GINEGraphClassifier(nn.Module):
+    def __init__(self, node_in_channels: int, edge_in_channels: int,
+                 hidden_channels: int, out_channels: int,
+                 num_gine_layers: int = 2,
+                 dropout_gine: float = 0.5, # Dropout after GINE layers' activation
+                 dropout_mlp: float = 0.5,  # Dropout in the final MLP
+                 pooling_type: str = 'mean', # 'mean', 'add', or 'max'
+                 eps: float = 0.,            # Epsilon for GIN (0 for GIN, learnable for GINE)
+                 train_eps: bool = False     # Whether epsilon is learnable
+                ):
+        super(GINEGraphClassifier, self).__init__()
+
+        if num_gine_layers < 1:
+            raise ValueError("Number of GINE layers must be at least 1.")
+
+        self.num_gine_layers = num_gine_layers
+        self.dropout_gine = dropout_gine
+        self.dropout_mlp = dropout_mlp
+        self.pooling_type = pooling_type
+
+        self.gine_layers = nn.ModuleList()
+
+        # The MLP for GINEConv processes node features.
+        # Edge features are summed with node features (after an optional MLP on edge features if you want,
+        # but GINEConv's internal nn processes the combination).
+        # GINEConv: x_j + edge_attr_ji passed through an MLP.
+        # Output dim of nn inside GINEConv should match hidden_channels.
+        
+        current_dim = node_in_channels
+
+        for i in range(num_gine_layers):
+            # The MLP inside GINEConv maps from current_dim to hidden_channels
+            # This MLP is applied to x_i (node features of the central node)
+            # and to the aggregated messages (which are transformations of x_j + edge_attr_ji)
+            # So, the `nn` should map `current_dim` to `hidden_channels`.
+            # And `edge_dim` is the dimensionality of your `edge_attr`.
+            
+            # Define the MLP for the GINEConv layer
+            # This MLP processes the node features (x_i) and the aggregated messages
+            # Its input dimension should be `current_dim` and output `hidden_channels`
+            layer_nn = nn.Sequential(
+                nn.Linear(current_dim, hidden_channels),
+                nn.ReLU(),
+                nn.Linear(hidden_channels, hidden_channels)
+            )
+            
+            self.gine_layers.append(
+                GINEConv(nn=layer_nn, eps=eps, train_eps=train_eps, edge_dim=edge_in_channels)
+            )
+            current_dim = hidden_channels # Output of GINE is hidden_channels
+
+        self.gine_output_dim = current_dim # Dimension before pooling
+
+        # Pooling layer
+        if pooling_type == 'mean':
+            self.pool = global_mean_pool
+        elif pooling_type == 'add':
+            self.pool = global_add_pool
+        elif pooling_type == 'max':
+            self.pool = global_max_pool
+        else:
+            raise ValueError(f"Unsupported pooling type: {pooling_type}")
+
+        # Classifier MLP
+        self.mlp = nn.Sequential(
+            nn.Linear(self.gine_output_dim, hidden_channels // 2 if hidden_channels // 2 > 0 else 1),
+            nn.ReLU(),
+            nn.Dropout(p=dropout_mlp),
+            nn.Linear(hidden_channels // 2 if hidden_channels // 2 > 0 else 1, out_channels)
+        )
+
+    def forward(self, data: Data) -> torch.Tensor:
+        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+
+        if x is None:
+            raise ValueError("Node features 'x' are None. Model requires node features.")
+        if x.dtype == torch.long:
+            x = x.float()
+        
+        if edge_attr is None:
+            raise ValueError("Edge attributes 'edge_attr' are None. GINEConv requires edge_attr.")
+        if edge_attr.dtype == torch.long: # Edge attributes are typically float
+            edge_attr = edge_attr.float()
 
 
-class GIN_Conv(MessagePassing):
-    def __init__(self, MLP, eps = 0.0):
-        super().__init__(aggr='add')  # Aggregation function over the messages.
-        self.mlp = MLP
-        self.epsilon = torch.nn.Parameter(torch.tensor([eps]))
+        # Pass through GINE layers
+        for gine_layer in self.gine_layers:
+            x = gine_layer(x, edge_index, edge_attr=edge_attr)
+            x = F.relu(x) # GINE paper often uses ReLU after the layer's MLP and aggregation
+            x = F.dropout(x, p=self.dropout_gine, training=self.training)
 
-    def message(self, x_j):
-      return x_j
+        # Graph pooling
+        if batch is None: # Handle single graph case
+            batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
+        
+        x_pooled = self.pool(x, batch)
 
-    def update(self,aggr_out,x):
-      x = (1+self.epsilon) * x + aggr_out
-      return self.mlp(x)
+        # Classification
+        out_logits = self.mlp(x_pooled)
 
-    def forward(self, x, edge_index):
-      #TODO
-      # Step 1: remove self-loops to the adjacency matrix.
-      edge_index, _ = remove_self_loops(edge_index)
-      # Step 2: Start propagating messages.
-      return self.propagate(edge_index, x=x)
-    
-class MLP(torch.nn.Module):
-    def __init__(self, in_dim, hidden_dim, out_dim):
-        super(MLP, self).__init__()
-        self.first_fc = Linear(in_dim, hidden_dim)
-        self.second_fc = Linear(hidden_dim, out_dim)
-        self.activation = torch.nn.ReLU()
-
-        # You could use torch.nn.Sequential
-
-    def forward(self, x):
-        x = self.activation(self.first_fc(x))
-        x = self.activation(self.second_fc(x))
-
-        return x
-
-class Graph_Net(torch.nn.Module):
-    def __init__(self, in_dim, hidden_dim, num_classes):
-        super(Graph_Net, self).__init__()
-        self.mlp_input =  MLP(in_dim, hidden_dim, hidden_dim)
-        self.mlp_hidden =  MLP(hidden_dim, hidden_dim, hidden_dim)
-        self.conv1 = GIN_Conv(self.mlp_input)
-        self.conv2 = GIN_Conv(self.mlp_hidden)
-        self.conv3 = GIN_Conv(self.mlp_hidden)
-        self.class_layer = torch.nn.Linear(hidden_dim, num_classes)
-
-    def forward(self, x, edge_index, batch):
-        # 1. Obtain node embeddings throug the 3 convolutional layers
-        x = self.conv1(x, edge_index)
-        x = x.relu()
-        x = self.conv2(x, edge_index)
-        x = x.relu()
-        x = self.conv3(x, edge_index)
-        x = x.relu()
-
-        # 2. Global average pooling layer
-        x = global_mean_pool(x, batch)
-        # 3. Classification layer
-        x = self.class_layer(x)
-        return x
+        return out_logits

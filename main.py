@@ -7,7 +7,7 @@ from source.loadData import ProcessedGraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import AddDegreeSquaredFeatures
-from source.model import SimpleGCN
+from source.model import SimpleGCN, GINEGraphClassifier
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -103,7 +103,7 @@ def main(args):
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
     # Define checkpoint path relative to the script's directory
-    model_name = "SimpleGCN"  # or "GINConv"
+    model_name = 'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
     checkpoints_folder = os.path.join(os.getcwd(), "checkpoints", test_dir_name, model_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
@@ -133,22 +133,16 @@ def main(args):
                 os.remove(filePath)
                 print(f"Removed previous checkpoint: {filePath}")
 
-        subset_size_desired = 1000
 
         root_dir = os.path.join(os.getcwd(), 'cached_datasets', test_dir_name, 'train')
         train_dataset = ProcessedGraphDataset(root=root_dir,raw_filename=args.train_path, transform=my_transform)
-        print(f"Train dataset first element: {train_dataset[0]}")
-        indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
-        train_subset = Subset(train_dataset, indices_for_subset)
 
         labels = []
-        for i in range(len(train_subset)):
-            labels.append(train_subset[i].y.item()) # .item() if y is a 0-dim tensor
+        for i in range(len(train_dataset)):
+            labels.append(train_dataset[i].y.item()) # .item() if y is a 0-dim tensor
 
         import collections
         label_counts = collections.Counter(labels)
-        print(f"Label distribution for the subset of {len(train_subset)} elements: {label_counts}")
-        print(f"Min label: {min(labels)}, Max label: {max(labels)}")
 
         all_labels_in_training_set = []
         for label, count in label_counts.items():
@@ -161,18 +155,33 @@ def main(args):
             print("Warning: Mismatch in expected vs. found classes. Using uniform weights for SCE.")
             class_weights_tensor = torch.ones(NUM_CLASSES, dtype=torch.float).to(device) # Fallback
         
+        NODE_IN_CHANNELS = 2    # e.g., from your degree + degree_sq features
+        EDGE_IN_CHANNELS = 7    # From your data.edge_attr shape
+        HIDDEN_CHANNELS = 32
+        NUM_CLASSES = 6
+        NUM_GINE_LAYERS = 2
+        DROPOUT_GINE = 0.5
+        DROPOUT_MLP = 0.3
+        POOLING_TYPE = 'mean'
     
         
 
-        model = SimpleGCN(in_channels=IN_CHANNELS,
-                      hidden_channels=HIDDEN_CHANNELS,
-                      out_channels=NUM_CLASSES).to(device)
+        #model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
+        model = GINEGraphClassifier(node_in_channels=NODE_IN_CHANNELS,
+                                   edge_in_channels=EDGE_IN_CHANNELS,
+                                   hidden_channels=HIDDEN_CHANNELS,
+                                   out_channels=NUM_CLASSES,
+                                   num_gine_layers=NUM_GINE_LAYERS,
+                                   dropout_gine=DROPOUT_GINE,
+                                   dropout_mlp=DROPOUT_MLP,
+                                   pooling_type=POOLING_TYPE).to(device)
+        
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
         criterion = SCELoss(alpha=1.0, beta=0.5, num_classes=NUM_CLASSES, reduction='mean')
 
 
-        train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
         
         best_accuracy = 0.0
         train_losses = []
