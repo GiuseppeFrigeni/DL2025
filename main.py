@@ -304,7 +304,7 @@ def main(args):
 
         node_feature_names = ["degree", "degree_squared"]
         edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names
-        get_feature_statistics(train_dataset, batch_size=32, node_feature_names=node_feature_names, edge_feature_names=edge_feature_names)
+        get_feature_statistics(train_dataset, batch_size=32, feature_names_x=node_feature_names, feature_names_edge=edge_feature_names)
 
         labels = []
         for i in range(len(train_dataset)):
