@@ -124,10 +124,8 @@ def train(data_loader, model, optimizer, criterion, device):
     total_loss = 0
     for data in data_loader:
         data = data.to(device)
-        print(f"Data batch shape: {data.x.shape}, Edge index shape: {data.edge_index.shape}, Edge attr shape: {data.edge_attr.shape if hasattr(data, 'edge_attr') else 'N/A'}")
         optimizer.zero_grad()
         output = model(data)  # Assuming model returns a tuple
-        print(output.shape)
         loss = criterion(output, data.y.squeeze())
         loss.backward()
         optimizer.step()
@@ -440,10 +438,9 @@ def main(args):
         criterion = SCELoss(alpha=1.0, beta=0.5, num_classes=NUM_CLASSES, reduction='mean')
 
 
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        vali_loader = DataLoader(validation_dataset, batch_size=32, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+        vali_loader = DataLoader(validation_dataset, batch_size=8, shuffle=False)
         
-        print(next(iter(train_loader)))  # Check if DataLoader works   
         best_accuracy = 0.0
         train_losses = []
         train_accuracies = []

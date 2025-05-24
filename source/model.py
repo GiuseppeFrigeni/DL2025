@@ -188,6 +188,7 @@ class GATGraphClassifier(torch.nn.Module):
         self.conv1 = GATConv(node_feature_dim, hidden_dim, heads=heads,edge_dim=edge_feature_dim, dropout=dropout)
         self.conv2 = GATConv(hidden_dim * heads, hidden_dim, heads=1, edge_dim=edge_feature_dim, dropout=dropout)
 
+        hidden_dim = hidden_dim * heads if heads > 1 else hidden_dim  # Adjust for multi-head output
         # Classifier MLP
         self.mlp = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2 if hidden_dim // 2 > 0 else 1),   
@@ -217,7 +218,5 @@ class GATGraphClassifier(torch.nn.Module):
         else:
             raise ValueError(f"Unsupported pooling type: {self.pooling_type}")
         
-        print(x_graph.shape)
         x = self.mlp(x_graph)
-        print(x.shape)
         return x
