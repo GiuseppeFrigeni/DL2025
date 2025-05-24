@@ -350,11 +350,11 @@ def main(args):
 
     NUM_CLASSES = 6    # For your subset
     LEARNING_RATE = 5e-4
-    EPOCHS = 150 
+    EPOCHS = 200 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5   # Weight for Reverse Cross Entropy
-    HIDDEN_DIM = 64
+    HIDDEN_DIM = 128
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
