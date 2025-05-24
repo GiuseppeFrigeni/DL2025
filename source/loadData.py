@@ -21,11 +21,11 @@ def dictToGraphObject(graph_dict): # Same as before
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, num_nodes=num_nodes, y=y)
 
 class ProcessedGraphDataset(Dataset):
-    def __init__(self, root: str, raw_filename_abs_path: str, # Direct path to your .json.gz
+    def __init__(self, root: str, raw_filename: str, # Direct path to your .json.gz
                  processed_file_suffix: str = "",
                  transform=None, pre_transform=None, pre_filter=None, log: bool = True):
         
-        self.raw_file_to_process_from = raw_filename_abs_path # Store the absolute path
+        self.raw_file_to_process_from = raw_filename# Store the absolute path
         if not os.path.exists(self.raw_file_to_process_from):
             raise FileNotFoundError(
                 f"Raw data file not found at the specified absolute path: {self.raw_file_to_process_from}"
