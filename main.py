@@ -299,8 +299,8 @@ def main(args):
 
 
         train_dataset = GraphDataset(args.train_path, transform=my_transform)
-        train_dataset.x[:,0] = (train_dataset.x[:,0] - train_dataset.x[:,0].mean()) / (train_dataset.x[:,0].std() + 1e-6) # Normalize degree
-        train_dataset.x[:,1] = (train_dataset.x[:,1] - train_dataset.x[:,1].mean()) / (train_dataset.x[:,1].std() + 1e-6) # Normalize degree squared
+        train_dataset.x[:,0] = (train_dataset.x[:,0] - train_dataset.x[:,0].min()) / (train_dataset.x[:,0].max() - train_dataset.x[:,0].min())  # Normalize degree
+        train_dataset.x[:,1] = (train_dataset.x[:,1] - train_dataset.x[:,1].min()) / (train_dataset.x[:,1].max() - train_dataset.x[:,1].min()) # Normalize degree squared
 
         node_feature_names = ["degree", "degree_squared"]
         edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names
