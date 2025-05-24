@@ -1,51 +1,70 @@
-import argparse
-import torch
-from torch_geometric.loader import DataLoader
-from torch_geometric.nn import GCNConv, global_mean_pool
-from source.loadData import GraphDataset
 import os
+import datetime
+import torch
+import logging
+import argparse
+from source.loadData import GraphDataset
+from torch_geometric.loader import DataLoader
+from torch_geometric import seed_everything
+from source.transforms import AddDegreeSquaredFeatures
+from source.model import SimpleGCN
 import pandas as pd
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-def add_zeros(data):
-    data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
-    return data
+from source.loss import SCELoss
+from torch import optim
 
+from sklearn.utils.class_weight import compute_class_weight
+import numpy as np
 
-class SimpleGCN(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(SimpleGCN, self).__init__()
-        self.embedding = torch.nn.Embedding(1, input_dim) 
-        self.conv1 = GCNConv(input_dim, hidden_dim)
-        self.conv2 = GCNConv(hidden_dim, hidden_dim)
-        self.global_pool = global_mean_pool  
-        self.fc = torch.nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
-        x = self.embedding(x)  
-        x = self.conv1(x, edge_index)
-        x = torch.relu(x)
-        x = self.conv2(x, edge_index)
-        x = self.global_pool(x, batch)  
-        out = self.fc(x)  
-        return out
+from torch.utils.data import Subset
 
 
-def train(data_loader):
+torch.backends.cuda.matmul.allow_tf32 = True  # Default False in PyTorch 1.12+
+torch.backends.cudnn.allow_tf32 = True  # Default True
+
+def plot_training_progress(train_losses, train_accuracies, output_dir):
+    epochs = range(1, len(train_losses) + 1)
+    plt.figure(figsize=(12, 6))
+
+    # Plot loss
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, train_losses, label="Training Loss", color='blue')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss per Epoch')
+
+    # Plot accuracy
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, train_accuracies, label="Training Accuracy", color='green')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Training Accuracy per Epoch')
+
+    # Save plots in the current directory
+    os.makedirs(output_dir, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "training_progress.png"))
+    plt.close()
+
+
+def train(data_loader, model, optimizer, criterion, device, class_weights):
     model.train()
     total_loss = 0
     for data in data_loader:
         data = data.to(device)
         optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, data.y)
+        output = model(data)  # Assuming model returns a tuple
+        loss = criterion(output, data.y, class_weights=class_weights)
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+
     return total_loss / len(data_loader)
 
 
-def evaluate(data_loader, calculate_accuracy=False):
+def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
     correct = 0
     total = 0
@@ -53,64 +72,152 @@ def evaluate(data_loader, calculate_accuracy=False):
     with torch.no_grad():
         for data in data_loader:
             data = data.to(device)
-            output = model(data)
+            output = model(data)  # Assuming model returns a tuple
             pred = output.argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
                 correct += (pred == data.y).sum().item()
                 total += data.y.size(0)
+            
     if calculate_accuracy:
         accuracy = correct / total
         return accuracy, predictions
     return predictions
 
 
+
 def main(args):
-    global model, optimizer, criterion, device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    seed_everything(42)  # Set random seed for reproducibility
 
-    # Parameters for the GCN model
-    input_dim = 300  # Example input feature dimension (you can adjust this)
-    hidden_dim = 64
-    output_dim = 6  # Number of classes
-    num_epochs = 10  # Number of epochs for training
-    lr = 0.001  # Learning rate
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = torch.device(device)
 
-    # Initialize the model, optimizer, and loss criterion
-    model = SimpleGCN(input_dim, hidden_dim, output_dim).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = torch.nn.CrossEntropyLoss()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    test_dir_name = os.path.basename(os.path.dirname(args.test_path))
 
-    # Prepare test dataset and loader
-    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    # Define log file path relative to the script's directory
+    logs_folder = os.path.join(os.getcwd(), "logs", test_dir_name)
+    log_file = os.path.join(logs_folder, "training.log")
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+    logging.getLogger().addHandler(logging.StreamHandler()) 
 
-    # Train dataset and loader (if train_path is provided)
+    # Define checkpoint path relative to the script's directory
+    checkpoints_folder = os.path.join(os.getcwd(), "checkpoints", test_dir_name)
+    os.makedirs(checkpoints_folder, exist_ok=True)
+
+
+    submission_dir = os.path.join(os.getcwd(), 'submission')
+    os.makedirs(submission_dir, exist_ok=True)
+
+
+    #transfrm
+    my_transform = AddDegreeSquaredFeatures()
+
+
     if args.train_path:
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+        IN_CHANNELS = 2
+        HIDDEN_CHANNELS = 64 # Example, tune this
+        NUM_CLASSES = 6    # For your subset
+        LEARNING_RATE = 1e-3
+        EPOCHS = 50 # Increase for the small subset
+        WEIGHT_DECAY = 1e-4 # Add some regularization
+
+        # Remove previous checkpoints for the same test dataset
+        for filePath in os.listdir(checkpoints_folder):
+            if test_dir_name in filePath:
+                os.remove(filePath)
+                print(f"Removed previous checkpoint: {filePath}")
+
+        subset_size_desired = 1000
+        train_dataset = GraphDataset(args.train_path, transform=my_transform)
+        indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
+        train_subset = Subset(train_dataset, indices_for_subset)
+
+        labels = []
+        for i in range(len(train_subset)):
+            labels.append(train_subset[i].y.item()) # .item() if y is a 0-dim tensor
+
+        import collections
+        label_counts = collections.Counter(labels)
+        print(f"Label distribution for the subset of {len(train_subset)} elements: {label_counts}")
+        print(f"Min label: {min(labels)}, Max label: {max(labels)}")
+
+        all_labels_in_training_set = []
+        for label, count in label_counts.items():
+            all_labels_in_training_set.extend([label] * count)
+        unique_classes_in_train = np.arange(NUM_CLASSES) # Assuming classes are 0 to NUM_CLASSES-1
+        if len(unique_classes_in_train) == NUM_CLASSES:
+            class_weights_values = compute_class_weight('balanced', classes=unique_classes_in_train, y=np.array(all_labels_in_training_set))
+            class_weights_tensor = torch.tensor(class_weights_values, dtype=torch.float).to(device)
+        else:
+            print("Warning: Mismatch in expected vs. found classes. Using uniform weights for SCE.")
+            class_weights_tensor = torch.ones(NUM_CLASSES, dtype=torch.float).to(device) # Fallback
+        
+    
+        
+
+        model = SimpleGCN(in_channels=IN_CHANNELS,
+                      hidden_channels=HIDDEN_CHANNELS,
+                      out_channels=NUM_CLASSES).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
+        criterion = SCELoss(alpha=1.0, beta=0.5, num_classes=NUM_CLASSES, reduction='mean')
+
+
+        train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
+        
+        best_accuracy = 0.0
+        train_losses = []
+        train_accuracies = []
 
         # Training loop
-        
-        for epoch in range(num_epochs):
-            train_loss = train(train_loader)
-            train_acc, _ = evaluate(train_loader, calculate_accuracy=True)
-            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+        for epoch in range(EPOCHS):
+                
+            train_loss = train(train_loader, model, optimizer, criterion, device, class_weights=class_weights_tensor )
+            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+
+            # Save logs for training progress
+            train_losses.append(train_loss)
+            train_accuracies.append(train_acc)
+
+            print(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            if (epoch + 1) % 5 == 0:
+                logging.info(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+
+                # Save best model
+            if train_acc > best_accuracy:
+                best_accuracy = train_acc
+                checkpoint_path = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_epoch_{epoch+1}.pth")
+                torch.save(model.state_dict(), checkpoint_path)
+                print(f"Best model updated and saved at {checkpoint_path}")
+
+
+
+
+    epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
+    best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
+    model.load_state_dict(best_model_state_dict)
+
+     # Prepare test dataset and loader
+    test_dataset = GraphDataset(args.test_path)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     # Evaluate and save test predictions
-    predictions = evaluate(test_loader, calculate_accuracy=False)
-    test_graph_ids = list(range(len(predictions)))  # Generate IDs for graphs
+    predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
+    test_graph_ids = list(range(len(predictions)))
 
     # Save predictions to CSV
     test_dir_name = os.path.dirname(args.test_path).split(os.sep)[-1]
-    output_csv_path = os.path.join(f"testset_{test_dir_name}.csv")
+    output_csv_path = os.path.join(f"submission/testset_{test_dir_name}.csv")
     output_df = pd.DataFrame({
-        "GraphID": test_graph_ids,
-        "Class": predictions
+        "id": test_graph_ids,
+        "pred": predictions
     })
     output_df.to_csv(output_csv_path, index=False)
     print(f"Test predictions saved to {output_csv_path}")
-
+    
 
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser(description="Train and evaluate a GCN model on graph datasets.")
