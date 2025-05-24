@@ -7,7 +7,7 @@ from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import AddDegreeSquaredFeatures
-from source.model import SimpleGCN, GINEGraphClassifier, GATGraphClassifier
+from source.model import SimpleGCN, GINEGraphClassifier
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
