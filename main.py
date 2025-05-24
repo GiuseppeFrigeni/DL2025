@@ -104,7 +104,7 @@ def main(args):
 
     # Define checkpoint path relative to the script's directory
     model_name = 'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
-    checkpoints_folder = os.path.join(os.getcwd(), "checkpoints", test_dir_name, model_name)
+    checkpoints_folder = os.path.join(os.getcwd(), "saved_models", test_dir_name, model_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
 
