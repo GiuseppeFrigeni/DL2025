@@ -353,11 +353,10 @@ def main(args):
     EPOCHS = 25 
     WEIGHT_DECAY = 5e-4 # Add some regularization
 
+    HIDDEN_DIM = 64
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
-    HIDDEN_DIM_GAT = 32
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    NUM_HEADS_GAT = 4
     DROPOUT_RATE = 0.5
 
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
@@ -422,14 +421,13 @@ def main(args):
         
 
         #model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
-        model = GATGraphClassifier(
-                    node_feature_dim=NODE_FEATURE_DIM, # Pass 2 here
-                    hidden_dim=HIDDEN_DIM_GAT,
-                    out_channels=NUM_CLASSES,
-                    edge_feature_dim=EDGE_FEATURE_DIM,
-                    heads=NUM_HEADS_GAT,
-                    dropout=DROPOUT_RATE
-                        ).to(device)
+        model = GINEGraphClassifier(
+            node_feature_dim=NODE_FEATURE_DIM, # Pass 2 here
+            hidden_dim=HIDDEN_DIM,
+            out_channels=NUM_CLASSES,
+            edge_feature_dim=EDGE_FEATURE_DIM,
+            dropout=DROPOUT_RATE
+        ).to(device)    
         
 
         
@@ -475,14 +473,13 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
-    model = GATGraphClassifier(
-                    node_feature_dim=NODE_FEATURE_DIM, # Pass 2 here
-                    hidden_dim=HIDDEN_DIM_GAT,
-                    out_channels=NUM_CLASSES,
-                    edge_feature_dim=EDGE_FEATURE_DIM,
-                    heads=NUM_HEADS_GAT,
-                    dropout=DROPOUT_RATE
-                        ).to(device)
+    model = GINEGraphClassifier(
+            node_feature_dim=NODE_FEATURE_DIM, # Pass 2 here
+            hidden_dim=HIDDEN_DIM,
+            out_channels=NUM_CLASSES,
+            edge_feature_dim=EDGE_FEATURE_DIM,
+            dropout=DROPOUT_RATE
+        ).to(device)   
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
