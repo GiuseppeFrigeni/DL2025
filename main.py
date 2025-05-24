@@ -124,6 +124,7 @@ def train(data_loader, model, optimizer, criterion, device):
     total_loss = 0
     for data in data_loader:
         data = data.to(device)
+        print(f"Data batch shape: {data.x.shape}, Edge index shape: {data.edge_index.shape}, Edge attr shape: {data.edge_attr.shape if hasattr(data, 'edge_attr') else 'N/A'}")
         optimizer.zero_grad()
         output = model(data)  # Assuming model returns a tuple
         print(output.shape)
