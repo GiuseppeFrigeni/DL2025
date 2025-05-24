@@ -351,7 +351,7 @@ def main(args):
     HIDDEN_CHANNELS = 64 # Example, tune this
     NUM_CLASSES = 6    # For your subset
     LEARNING_RATE = 5e-4
-    EPOCHS = 50 # Increase for the small subset
+    EPOCHS = 25 
     WEIGHT_DECAY = 1e-4 # Add some regularization
 
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
