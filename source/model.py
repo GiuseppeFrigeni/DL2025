@@ -198,17 +198,17 @@ class GATGraphClassifier(torch.nn.Module):
     def forward(self, data: Data) -> torch.Tensor:
 
         x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
-        print(x.shape())
+        print(x.shape)
         x = x.float()
 
         x = self.conv1(x, edge_index, edge_attr=edge_attr)
-        print(x.shape())
+        print(x.shape)
         x = F.elu(x)
 
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv2(x, edge_index, edge_attr=edge_attr)
-        print(x.shape())
+        print(x.shape)
         x = F.elu(x)
         x = self.mlp(x)
-        print(x.shape())
+        print(x.shape)
         return x
