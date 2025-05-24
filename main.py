@@ -329,7 +329,7 @@ def main(args):
             print("Warning: Mismatch in expected vs. found classes. Using uniform weights for SCE.")
             class_weights_tensor = torch.ones(NUM_CLASSES, dtype=torch.float).to(device) # Fallback
         
-        NODE_IN_CHANNELS = 2    # e.g., from your degree + degree_sq features
+        NODE_IN_CHANNELS = 1   # e.g., from your degree + degree_sq features
         EDGE_IN_CHANNELS = 7    # From your data.edge_attr shape
         HIDDEN_CHANNELS = 32
         NUM_CLASSES = 6
