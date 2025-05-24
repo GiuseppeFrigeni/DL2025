@@ -67,8 +67,6 @@ class ProcessedGraphDataset(Dataset):
         # This method should not be called if raw_file_names is empty.
         # If it were called, it would mean there's a misunderstanding in PyG's logic
         # or our setup. We can leave it as a pass or raise an error.
-        if self.log:
-            print("Download method called, but raw files are handled externally. This should ideally not happen.")
         pass
 
     def process(self):
