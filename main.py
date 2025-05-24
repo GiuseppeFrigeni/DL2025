@@ -26,6 +26,11 @@ from torch.utils.data import Subset
 torch.backends.cuda.matmul.allow_tf32 = True  # Default False in PyTorch 1.12+
 torch.backends.cudnn.allow_tf32 = True  # Default True
 
+def add_zeros(data):
+    data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
+    return data
+
+
 def plot_training_progress(train_losses, train_accuracies, output_dir):
     epochs = range(1, len(train_losses) + 1)
     plt.figure(figsize=(12, 6))
@@ -298,11 +303,11 @@ def main(args):
                 print(f"Removed previous checkpoint: {filePath}")
 
 
-        train_dataset = GraphDataset(args.train_path, transform=my_transform)
-        train_dataset.x[:,0] = (train_dataset.x[:,0] - train_dataset.x[:,0].min()) / (train_dataset.x[:,0].max() - train_dataset.x[:,0].min())  # Normalize degree
-        train_dataset.x[:,1] = (train_dataset.x[:,1] - train_dataset.x[:,1].min()) / (train_dataset.x[:,1].max() - train_dataset.x[:,1].min()) # Normalize degree squared
+        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
+        #train_dataset.x[:,0] = (train_dataset.x[:,0] - train_dataset.x[:,0].min()) / (train_dataset.x[:,0].max() - train_dataset.x[:,0].min())  # Normalize degree
+        #train_dataset.x[:,1] = (train_dataset.x[:,1] - train_dataset.x[:,1].min()) / (train_dataset.x[:,1].max() - train_dataset.x[:,1].min()) # Normalize degree squared
 
-        node_feature_names = ["degree", "degree_squared"]
+        node_feature_names = ["zeros"]
         edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names
         get_feature_statistics(train_dataset, batch_size=32, feature_names_x=node_feature_names, feature_names_edge=edge_feature_names)
 
