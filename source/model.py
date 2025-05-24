@@ -167,3 +167,44 @@ class GINEGraphClassifier(nn.Module):
         out_logits = self.mlp(x_pooled)
 
         return out_logits
+    
+
+import torch
+import torch.nn.functional as F
+from torch.nn import Embedding, Linear
+from torch_geometric.nn import GATConv
+from torch_geometric.data import Data
+
+class GATGraphClassifier(torch.nn.Module):
+    def __init__(self, node_feature_dim, embedding_dim, hidden_dim, out_channels,
+                 edge_feature_dim, heads=8, dropout=0.6):
+        super(GATGraphClassifier, self).__init__()
+        self.node_feature_dim = node_feature_dim
+        self.embedding_dim = embedding_dim
+        self.dropout = dropout
+        self.heads = heads
+
+
+        self.conv1 = GATConv(node_feature_dim, hidden_dim, heads=heads, dropout=dropout)
+        self.conv2 = GATConv(hidden_dim * heads, hidden_dim, heads=1, dropout=dropout)
+
+        # Classifier MLP
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2 if hidden_dim // 2 > 0 else 1),   
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_dim // 2 if hidden_dim // 2 > 0 else 1, out_channels)
+        )
+
+    def forward(self, data: Data) -> torch.Tensor:
+
+        edge_index, edge_attr = data.edge_index, data.edge_attr
+
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.conv1(x, edge_index, edge_attr=edge_attr)
+        x = F.elu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.conv2(x, edge_index, edge_attr=edge_attr)
+        x = F.elu(x)
+        x = self.mlp(x)
+        return x
