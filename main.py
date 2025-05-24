@@ -38,7 +38,7 @@ def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     """
     all_features_dim = []
     loader = DataLoader(dataset, batch_size=64, shuffle=False) # Use DataLoader for efficiency
-    print(f"Calculating stats for node feature dimension {feature_dim}...")
+    #print(f"Calculating stats for node feature dimension {feature_dim}...")
     for batch_data in loader:
         if batch_data.x is not None and batch_data.x.numel() > 0 and batch_data.x.shape[1] > feature_dim:
             all_features_dim.append(batch_data.x[:, feature_dim].cpu())
@@ -54,7 +54,7 @@ def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     # mean_val = features_tensor_dim.mean()
     # std_val = features_tensor_dim.std()
     # return mean_val, std_val
-    print(f"Stats for dim {feature_dim}: Min={min_val.item()}, Max={max_val.item()}")
+    #print(f"Stats for dim {feature_dim}: Min={min_val.item()}, Max={max_val.item()}")
     return min_val, max_val
 
 
