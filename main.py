@@ -348,13 +348,14 @@ def main(args):
     #transfrm
     my_transform = AddDegreeSquaredFeatures()
 
+    NUM_GINE_LAYERS = 3  # Number of GINE layers in the model
     NUM_CLASSES = 6    # For your subset
     LEARNING_RATE = 5e-4
     EPOCHS = 200 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5   # Weight for Reverse Cross Entropy
-    HIDDEN_DIM = 128
+    HIDDEN_DIM = 64
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
@@ -435,6 +436,7 @@ def main(args):
             dropout_gine=DROPOUT_RATE,
             dropout_mlp=DROPOUT_RATE,
             use_batch_norm=use_batch_norm,  # Enable batch normalization
+            num_gine_layers=NUM_GINE_LAYERS
         ).to(device)    
         
 
