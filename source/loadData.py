@@ -20,7 +20,7 @@ def dictToGraphObject(graph_dict): # Same as before
     x = torch.tensor(x_raw, dtype=torch.float) if x_raw is not None else None
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, num_nodes=num_nodes, y=y)
 
-class ProcessedGraphDatasetExternalRaw(Dataset):
+class ProcessedGraphDataset(Dataset):
     def __init__(self, root: str, raw_filename_abs_path: str, # Direct path to your .json.gz
                  processed_file_suffix: str = "",
                  transform=None, pre_transform=None, pre_filter=None, log: bool = True):
