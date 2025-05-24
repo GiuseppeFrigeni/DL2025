@@ -359,6 +359,8 @@ def main(args):
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE = 0.5
+    BATCH_SIZE = 32
+    use_batch_norm = True  # Enable batch normalization in the model
 
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
     print(test_dataset[0])
@@ -429,7 +431,7 @@ def main(args):
             out_channels=NUM_CLASSES,
             dropout_gine=DROPOUT_RATE,
             dropout_mlp=DROPOUT_RATE,
-            use_batch_norm=True,  # Enable batch normalization
+            use_batch_norm=use_batch_norm,  # Enable batch normalization
         ).to(device)    
         
 
@@ -439,8 +441,8 @@ def main(args):
         criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
 
 
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        vali_loader = DataLoader(validation_dataset, batch_size=32, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+        vali_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
         
         best_accuracy = 0.0
         train_losses = []
@@ -461,7 +463,7 @@ def main(args):
             vali_accuracies.append(vali_acc)
 
             print(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {vali_acc:.4f}")
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 10 == 0:
                 logging.info(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {vali_acc:.4f}")
 
                 # Save best model
