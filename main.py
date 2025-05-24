@@ -11,6 +11,8 @@ from source.model import SimpleGCN, GINEGraphClassifier
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from torch_geometric.data import Data, Dataset # Or your specific dataset class
+from typing import List, Union
 
 from source.loss import SCELoss
 from torch import optim
@@ -84,6 +86,170 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
         return accuracy, predictions
     return predictions
 
+def get_feature_statistics(dataset: Union[Dataset, List[Data]], batch_size: int = 64, feature_names_x: List[str] = None, feature_names_edge: List[str] = None):
+    """
+    Computes and prints statistics for node and edge features in a PyG dataset.
+
+    Args:
+        dataset: A PyG Dataset object or a list of Data objects.
+        batch_size: Batch size for DataLoader if processing a large dataset.
+        feature_names_x: Optional list of names for node features.
+        feature_names_edge: Optional list of names for edge features.
+    """
+    all_node_features = []
+    all_edge_features = []
+    num_graphs = 0
+    total_nodes = 0
+    total_edges = 0
+
+    # Use DataLoader for efficient iteration, especially for large datasets
+    # If dataset is small and already in memory as a list of Data, DataLoader is not strictly necessary
+    # but good practice.
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    print("Processing dataset to gather features...")
+    for i, batch_data in enumerate(loader):
+        # For a single Data object if not using DataLoader, or if dataset is a list
+        # if isinstance(dataset, Dataset): data_list = [dataset[i] for i in range(len(dataset))]
+        # else: data_list = dataset
+        # for data in data_list:
+
+        # If using DataLoader, batch_data is a Batch object.
+        # We need to access features per graph or collect them all.
+        # For overall statistics, it's easier to collect all features.
+
+        if hasattr(batch_data, 'x') and batch_data.x is not None and batch_data.x.numel() > 0:
+            all_node_features.append(batch_data.x.cpu()) # Move to CPU to avoid OOM on GPU
+            total_nodes += batch_data.num_nodes
+        else:
+            if i == 0: print("Warning: No node features (data.x) found in the first batch/graph.")
+
+
+        if hasattr(batch_data, 'edge_attr') and batch_data.edge_attr is not None and batch_data.edge_attr.numel() > 0:
+            all_edge_features.append(batch_data.edge_attr.cpu()) # Move to CPU
+            total_edges += batch_data.num_edges
+        else:
+            if i == 0: print("Warning: No edge features (data.edge_attr) found in the first batch/graph.")
+
+        num_graphs += batch_data.num_graphs if hasattr(batch_data, 'num_graphs') else 1 # Handle single Data or Batch
+
+        if (i + 1) % 10 == 0:
+            print(f"  Processed { (i + 1) * batch_size if hasattr(batch_data, 'num_graphs') else (i+1)} graphs...")
+
+    print(f"\n--- Dataset Overview ---")
+    print(f"Total number of graphs: {num_graphs}") # This might be more accurately len(dataset) if not using loader on full dataset
+    print(f"Total number of nodes: {total_nodes}")
+    print(f"Total number of edges: {total_edges}")
+    if total_nodes > 0:
+        print(f"Average nodes per graph: {total_nodes / num_graphs:.2f}")
+    if total_edges > 0 and num_graphs > 0 :
+         print(f"Average edges per graph: {total_edges / num_graphs:.2f}")
+
+
+    if not all_node_features:
+        print("\nNo node features found in the dataset to analyze.")
+    else:
+        # Concatenate all node features
+        node_features_tensor = torch.cat(all_node_features, dim=0)
+        num_node_feature_dims = node_features_tensor.shape[1]
+        print(f"\n--- Node Feature Statistics (data.x) ---")
+        print(f"Shape of concatenated node features: {node_features_tensor.shape}")
+        print(f"Number of node feature dimensions: {num_node_feature_dims}")
+
+        if feature_names_x and len(feature_names_x) != num_node_feature_dims:
+            print(f"Warning: Mismatch between provided node feature names ({len(feature_names_x)}) and actual dimensions ({num_node_feature_dims}). Using generic names.")
+            feature_names_x = [f"NodeFeat_{j}" for j in range(num_node_feature_dims)]
+        elif not feature_names_x:
+            feature_names_x = [f"NodeFeat_{j}" for j in range(num_node_feature_dims)]
+
+        for j in range(num_node_feature_dims):
+            feature_col = node_features_tensor[:, j]
+            print(f"\n  Feature: {feature_names_x[j]} (Dimension {j})")
+            print(f"    Min: {feature_col.min().item():.4f}")
+            print(f"    Max: {feature_col.max().item():.4f}")
+            print(f"    Mean: {feature_col.mean().item():.4f}")
+            print(f"    Std Dev: {feature_col.std().item():.4f}")
+            print(f"    Median: {feature_col.median().item():.4f}")
+            # Check for NaNs or Infs
+            if torch.isnan(feature_col).any():
+                print(f"    WARNING: Contains NaNs!")
+            if torch.isinf(feature_col).any():
+                print(f"    WARNING: Contains Infs!")
+        # Overall stats
+        print(f"\n  Overall Node Feature Stats:")
+        print(f"    Min (all features): {node_features_tensor.min().item():.4f}")
+        print(f"    Max (all features): {node_features_tensor.max().item():.4f}")
+        print(f"    Mean (all features): {node_features_tensor.mean().item():.4f}")
+        print(f"    Std Dev (all features): {node_features_tensor.std().item():.4f}")
+
+
+    if not all_edge_features:
+        print("\nNo edge features found in the dataset to analyze.")
+    else:
+        # Concatenate all edge features
+        edge_features_tensor = torch.cat(all_edge_features, dim=0)
+        num_edge_feature_dims = edge_features_tensor.shape[1]
+        print(f"\n--- Edge Feature Statistics (data.edge_attr) ---")
+        print(f"Shape of concatenated edge features: {edge_features_tensor.shape}")
+        print(f"Number of edge feature dimensions: {num_edge_feature_dims}")
+
+        if feature_names_edge and len(feature_names_edge) != num_edge_feature_dims:
+            print(f"Warning: Mismatch between provided edge feature names ({len(feature_names_edge)}) and actual dimensions ({num_edge_feature_dims}). Using generic names.")
+            feature_names_edge = [f"EdgeFeat_{j}" for j in range(num_edge_feature_dims)]
+        elif not feature_names_edge:
+            feature_names_edge = [f"EdgeFeat_{j}" for j in range(num_edge_feature_dims)]
+
+
+        for j in range(num_edge_feature_dims):
+            feature_col = edge_features_tensor[:, j]
+            print(f"\n  Feature: {feature_names_edge[j]} (Dimension {j})")
+            print(f"    Min: {feature_col.min().item():.4f}")
+            print(f"    Max: {feature_col.max().item():.4f}")
+            print(f"    Mean: {feature_col.mean().item():.4f}")
+            print(f"    Std Dev: {feature_col.std().item():.4f}")
+            print(f"    Median: {feature_col.median().item():.4f}")
+            if torch.isnan(feature_col).any():
+                print(f"    WARNING: Contains NaNs!")
+            if torch.isinf(feature_col).any():
+                print(f"    WARNING: Contains Infs!")
+        # Overall stats
+        print(f"\n  Overall Edge Feature Stats:")
+        print(f"    Min (all features): {edge_features_tensor.min().item():.4f}")
+        print(f"    Max (all features): {edge_features_tensor.max().item():.4f}")
+        print(f"    Mean (all features): {edge_features_tensor.mean().item():.4f}")
+        print(f"    Std Dev (all features): {edge_features_tensor.std().item():.4f}")
+
+    # Add label statistics if data.y is present
+    all_labels = []
+    has_labels = False
+    # Re-iterate or assume labels were collected if small enough
+    # For simplicity here, let's re-iterate for labels, or better, check first graph
+    if hasattr(dataset[0] if isinstance(dataset, Dataset) else dataset[0], 'y') and \
+       (dataset[0] if isinstance(dataset, Dataset) else dataset[0]).y is not None:
+        has_labels = True
+        print("\nCollecting label information...")
+        for batch_data in loader: # Iterate again or integrate into the first loop if memory allows
+            if hasattr(batch_data, 'y') and batch_data.y is not None:
+                all_labels.append(batch_data.y.cpu())
+
+    if has_labels and all_labels:
+        labels_tensor = torch.cat(all_labels)
+        print(f"\n--- Label Statistics (data.y) ---")
+        print(f"Shape of concatenated labels: {labels_tensor.shape}")
+        if labels_tensor.numel() > 0:
+            print(f"Min label: {labels_tensor.min().item()}")
+            print(f"Max label: {labels_tensor.max().item()}")
+            unique_labels, counts = torch.unique(labels_tensor, return_counts=True)
+            print(f"Unique labels and their counts:")
+            for label, count in zip(unique_labels, counts):
+                print(f"  Label {label.item()}: {count.item()} occurrences")
+        else:
+            print("Labels tensor is empty.")
+    elif has_labels:
+        print("\nLabels attribute (data.y) found, but no labels collected (possibly all None).")
+    else:
+        print("\nNo labels (data.y) found in the dataset.")
+
 
 
 def main(args):
@@ -135,6 +301,10 @@ def main(args):
 
 
         train_dataset = GraphDataset(args.train_path, transform=my_transform)
+
+        node_feature_names = ["degree", "degree_squared"]
+        edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names
+        get_feature_statistics(train_dataset, batch_size=32, node_feature_names=node_feature_names, edge_feature_names=edge_feature_names)
 
         labels = []
         for i in range(len(train_dataset)):
