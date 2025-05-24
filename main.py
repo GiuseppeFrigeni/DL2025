@@ -352,7 +352,8 @@ def main(args):
     LEARNING_RATE = 5e-4
     EPOCHS = 100 
     WEIGHT_DECAY = 1e-4 # Add some regularization
-
+    ALPHA = 1.0  # Weight for Cross Entropy
+    BETA = 0.5   # Weight for Reverse Cross Entropy
     HIDDEN_DIM = 64
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
@@ -435,7 +436,7 @@ def main(args):
         
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
-        criterion = SCELoss(alpha=1.0, beta=0.5, num_classes=NUM_CLASSES, reduction='mean')
+        criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
 
 
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
