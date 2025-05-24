@@ -16,6 +16,7 @@ from typing import List, Union
 
 from source.loss import SCELoss
 from torch import optim
+from torch_geometric.transforms import BaseTransform
 
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
@@ -29,6 +30,67 @@ torch.backends.cudnn.allow_tf32 = True  # Default True
 def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
     return data
+
+def get_node_feature_stats(dataset: Dataset, feature_dim: int):
+    """
+    Calculates min and max for a specific node feature dimension across the dataset.
+    Alternatively, calculate mean and std for standardization.
+    """
+    all_features_dim = []
+    loader = DataLoader(dataset, batch_size=64, shuffle=False) # Use DataLoader for efficiency
+    print(f"Calculating stats for node feature dimension {feature_dim}...")
+    for batch_data in loader:
+        if batch_data.x is not None and batch_data.x.numel() > 0 and batch_data.x.shape[1] > feature_dim:
+            all_features_dim.append(batch_data.x[:, feature_dim].cpu())
+
+    if not all_features_dim:
+        print(f"Warning: No features found for dimension {feature_dim} to calculate stats.")
+        return None, None # Or torch.tensor(0.0), torch.tensor(1.0) for no-op normalization
+
+    features_tensor_dim = torch.cat(all_features_dim)
+    min_val = features_tensor_dim.min()
+    max_val = features_tensor_dim.max()
+    # For standardization:
+    # mean_val = features_tensor_dim.mean()
+    # std_val = features_tensor_dim.std()
+    # return mean_val, std_val
+    print(f"Stats for dim {feature_dim}: Min={min_val.item()}, Max={max_val.item()}")
+    return min_val, max_val
+
+
+# --- Step 2: Create a Transform to Apply Normalization ---
+class NormalizeNodeFeatures(BaseTransform):
+    def __init__(self, norm_params_list):
+        """
+        Args:
+            norm_params_list: A list of tuples, where each tuple contains
+                              (min_val, max_val) for a feature dimension.
+                              Or (mean_val, std_val) if doing standardization.
+        """
+        super().__init__()
+        self.norm_params_list = norm_params_list
+
+    def __call__(self, data: Data):
+        if data.x is not None and data.x.numel() > 0:
+            x_normalized = data.x.clone() # Important to clone to avoid modifying original in-place if not desired
+            for dim_idx, params in enumerate(self.norm_params_list):
+                if dim_idx < x_normalized.shape[1]: # Check if feature dimension exists
+                    min_val, max_val = params
+                    # Min-Max Normalization
+                    if (max_val - min_val) > 1e-6: # Avoid division by zero
+                        x_normalized[:, dim_idx] = (x_normalized[:, dim_idx] - min_val) / (max_val - min_val)
+                    else: # If max == min, set to 0 or 0.5, or handle as needed
+                        x_normalized[:, dim_idx] = 0.0
+                    
+                    # For Standardization:
+                    # mean_val, std_val = params
+                    # if std_val > 1e-6: # Avoid division by zero
+                    #     x_normalized[:, dim_idx] = (x_normalized[:, dim_idx] - mean_val) / std_val
+                    # else:
+                    #     x_normalized[:, dim_idx] = 0.0 # Or just (x - mean_val)
+
+            data.x = x_normalized
+        return data
 
 
 def plot_training_progress(train_losses, train_accuracies, output_dir):
@@ -292,6 +354,8 @@ def main(args):
     EPOCHS = 50 # Increase for the small subset
     WEIGHT_DECAY = 1e-4 # Add some regularization
 
+    test_dataset = GraphDataset(args.test_path, transform=my_transform)
+
     if args.train_path:
 
         
@@ -303,9 +367,26 @@ def main(args):
                 print(f"Removed previous checkpoint: {filePath}")
 
 
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
-        #train_dataset.x[:,0] = (train_dataset.x[:,0] - train_dataset.x[:,0].min()) / (train_dataset.x[:,0].max() - train_dataset.x[:,0].min())  # Normalize degree
-        #train_dataset.x[:,1] = (train_dataset.x[:,1] - train_dataset.x[:,1].min()) / (train_dataset.x[:,1].max() - train_dataset.x[:,1].min()) # Normalize degree squared
+        train_dataset = GraphDataset(args.train_path, transform=my_transform)
+        
+        min_deg, max_deg = get_node_feature_stats(train_dataset, feature_dim=0)
+        min_deg_sq, max_deg_sq = get_node_feature_stats(train_dataset, feature_dim=1)
+        norm_params = []
+        norm_params.append((min_deg, max_deg))
+        norm_params.append((min_deg_sq, max_deg_sq))
+
+        if hasattr(train_dataset, 'transform') and train_dataset.transform is not None:
+            from torch_geometric.transforms import Compose
+            train_dataset.transform = Compose([train_dataset.transform, normalizer])
+            if test_dataset is not None:
+                 test_dataset.transform = Compose([test_dataset.transform, normalizer]) # Use TRAIN stats for val/test
+        else:
+            train_dataset.transform = normalizer
+            if test_dataset is not None:
+                test_dataset.transform = normalizer
+
+        # Create the normalization transform instance
+        normalizer = NormalizeNodeFeatures(norm_params_list=norm_params)
 
         #node_feature_names = ["zeros"]
         #edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names
@@ -329,7 +410,7 @@ def main(args):
             print("Warning: Mismatch in expected vs. found classes. Using uniform weights for SCE.")
             class_weights_tensor = torch.ones(NUM_CLASSES, dtype=torch.float).to(device) # Fallback
         
-        NODE_IN_CHANNELS = 1   # e.g., from your degree + degree_sq features
+        NODE_IN_CHANNELS = 2   # e.g., from your degree + degree_sq features
         EDGE_IN_CHANNELS = 7    # From your data.edge_attr shape
         HIDDEN_CHANNELS = 32
         NUM_CLASSES = 6
@@ -391,7 +472,7 @@ def main(args):
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
-    test_dataset = GraphDataset(raw_filename=args.test_path, transform=my_transform)
+    
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     # Evaluate and save test predictions
