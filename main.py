@@ -3,7 +3,7 @@ import datetime
 import torch
 import logging
 import argparse
-from source.loadData import GraphDataset
+from source.loadData import ProcessedGraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import AddDegreeSquaredFeatures
@@ -108,6 +108,7 @@ def main(args):
     os.makedirs(checkpoints_folder, exist_ok=True)
 
 
+
     submission_dir = os.path.join(os.getcwd(), 'submission')
     os.makedirs(submission_dir, exist_ok=True)
 
@@ -115,15 +116,16 @@ def main(args):
     #transfrm
     my_transform = AddDegreeSquaredFeatures()
 
+    IN_CHANNELS = 2
+    HIDDEN_CHANNELS = 64 # Example, tune this
+    NUM_CLASSES = 6    # For your subset
+    LEARNING_RATE = 1e-3
+    EPOCHS = 50 # Increase for the small subset
+    WEIGHT_DECAY = 1e-4 # Add some regularization
 
     if args.train_path:
 
-        IN_CHANNELS = 2
-        HIDDEN_CHANNELS = 64 # Example, tune this
-        NUM_CLASSES = 6    # For your subset
-        LEARNING_RATE = 1e-3
-        EPOCHS = 50 # Increase for the small subset
-        WEIGHT_DECAY = 1e-4 # Add some regularization
+        
 
         # Remove previous checkpoints for the same test dataset
         for filePath in os.listdir(checkpoints_folder):
@@ -132,7 +134,9 @@ def main(args):
                 print(f"Removed previous checkpoint: {filePath}")
 
         subset_size_desired = 1000
-        train_dataset = GraphDataset(args.train_path, transform=my_transform)
+
+        root_dir = os.path.join(os.getcwd(), 'cached_datasets', test_dir_name, 'train')
+        train_dataset = ProcessedGraphDataset(root=root_dir,raw_filename=args.train_path, transform=my_transform)
         print(f"Train dataset first element: {train_dataset[0]}")
         indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
         train_subset = Subset(train_dataset, indices_for_subset)
@@ -200,10 +204,12 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
+    model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
-    test_dataset = GraphDataset(args.test_path)
+    root_dir = os.path.join(os.getcwd(), 'cached_datasets', test_dir_name, 'test')
+    test_dataset = ProcessedGraphDataset(raw_filename=args.test_path, transform=my_transform, root=root_dir)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     # Evaluate and save test predictions
