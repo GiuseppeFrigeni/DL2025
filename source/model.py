@@ -197,9 +197,9 @@ class GATGraphClassifier(torch.nn.Module):
 
     def forward(self, data: Data) -> torch.Tensor:
 
-        edge_index, edge_attr = data.edge_index, data.edge_attr
+        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        x = x.float()
 
-        x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv1(x, edge_index, edge_attr=edge_attr)
         x = F.elu(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
