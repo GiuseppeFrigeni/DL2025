@@ -56,3 +56,70 @@ class SimpleGCN(torch.nn.Module):
         from torch_geometric.nn import global_mean_pool # Or global_add_pool, etc.
         x_pooled = global_mean_pool(x, batch) # `batch` vector from DataLoader is crucial
         return x_pooled # Logits for graph classification
+
+
+from torch_geometric.utils import remove_self_loops
+from torch_geometric.nn import MessagePassing
+from torch.nn import Linear
+from torch_geometric.nn import global_mean_pool
+
+
+class GIN_Conv(MessagePassing):
+    def __init__(self, MLP, eps = 0.0):
+        super().__init__(aggr='add')  # Aggregation function over the messages.
+        self.mlp = MLP
+        self.epsilon = torch.nn.Parameter(torch.tensor([eps]))
+
+    def message(self, x_j):
+      return x_j
+
+    def update(self,aggr_out,x):
+      x = (1+self.epsilon) * x + aggr_out
+      return self.mlp(x)
+
+    def forward(self, x, edge_index):
+      #TODO
+      # Step 1: remove self-loops to the adjacency matrix.
+      edge_index, _ = remove_self_loops(edge_index)
+      # Step 2: Start propagating messages.
+      return self.propagate(edge_index, x=x)
+    
+class MLP(torch.nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim):
+        super(MLP, self).__init__()
+        self.first_fc = Linear(in_dim, hidden_dim)
+        self.second_fc = Linear(hidden_dim, out_dim)
+        self.activation = torch.nn.ReLU()
+
+        # You could use torch.nn.Sequential
+
+    def forward(self, x):
+        x = self.activation(self.first_fc(x))
+        x = self.activation(self.second_fc(x))
+
+        return x
+
+class Graph_Net(torch.nn.Module):
+    def __init__(self, in_dim, hidden_dim, num_classes):
+        super(Graph_Net, self).__init__()
+        self.mlp_input =  MLP(in_dim, hidden_dim, hidden_dim)
+        self.mlp_hidden =  MLP(hidden_dim, hidden_dim, hidden_dim)
+        self.conv1 = GIN_Conv(self.mlp_input)
+        self.conv2 = GIN_Conv(self.mlp_hidden)
+        self.conv3 = GIN_Conv(self.mlp_hidden)
+        self.class_layer = torch.nn.Linear(hidden_dim, num_classes)
+
+    def forward(self, x, edge_index, batch):
+        # 1. Obtain node embeddings throug the 3 convolutional layers
+        x = self.conv1(x, edge_index)
+        x = x.relu()
+        x = self.conv2(x, edge_index)
+        x = x.relu()
+        x = self.conv3(x, edge_index)
+        x = x.relu()
+
+        # 2. Global average pooling layer
+        x = global_mean_pool(x, batch)
+        # 3. Classification layer
+        x = self.class_layer(x)
+        return x

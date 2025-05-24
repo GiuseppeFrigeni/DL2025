@@ -132,6 +132,7 @@ def main(args):
 
         subset_size_desired = 1000
         train_dataset = GraphDataset(args.train_path, transform=my_transform)
+        print(f"Train dataset first element: {train_dataset[0]}")
         indices_for_subset = list(range(min(subset_size_desired, train_dataset.len())))
         train_subset = Subset(train_dataset, indices_for_subset)
 
