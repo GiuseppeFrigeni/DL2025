@@ -354,6 +354,15 @@ def main(args):
     EPOCHS = 25 
     WEIGHT_DECAY = 1e-4 # Add some regularization
 
+    NODE_IN_CHANNELS = 2   # e.g., from your degree + degree_sq features
+    EDGE_IN_CHANNELS = 7    # From your data.edge_attr shape
+    HIDDEN_CHANNELS = 32
+    NUM_CLASSES = 6
+    NUM_GINE_LAYERS = 2
+    DROPOUT_GINE = 0.5
+    DROPOUT_MLP = 0.3
+    POOLING_TYPE = 'mean'
+
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
 
     if args.train_path:
@@ -409,14 +418,7 @@ def main(args):
             print("Warning: Mismatch in expected vs. found classes. Using uniform weights for SCE.")
             class_weights_tensor = torch.ones(NUM_CLASSES, dtype=torch.float).to(device) # Fallback
         
-        NODE_IN_CHANNELS = 2   # e.g., from your degree + degree_sq features
-        EDGE_IN_CHANNELS = 7    # From your data.edge_attr shape
-        HIDDEN_CHANNELS = 32
-        NUM_CLASSES = 6
-        NUM_GINE_LAYERS = 2
-        DROPOUT_GINE = 0.5
-        DROPOUT_MLP = 0.3
-        POOLING_TYPE = 'mean'
+
     
         
 
