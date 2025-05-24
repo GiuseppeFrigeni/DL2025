@@ -466,8 +466,8 @@ def main(args):
                 logging.info(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {vali_acc:.4f}")
 
                 # Save best model
-            if train_acc > best_accuracy:
-                best_accuracy = train_acc
+            if vali_acc > best_accuracy:
+                best_accuracy = vali_acc
                 checkpoint_path = os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
                 torch.save(model.state_dict(), checkpoint_path)
                 print(f"Best model updated and saved at {checkpoint_path}")
