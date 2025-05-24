@@ -364,6 +364,7 @@ def main(args):
     POOLING_TYPE = 'mean'
 
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
+    print(test_dataset[0])
 
     if args.train_path:
 
