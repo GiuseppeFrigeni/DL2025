@@ -69,7 +69,7 @@ class GraphDataset(Dataset):
         
         # Load data from processed path
         try:
-            self.graphs = torch.load(self.processed_paths[0])
+            self.graphs = torch.load(self.processed_paths[0], weights_only=False)
             print(f"Successfully loaded processed data from: {self.processed_paths[0]}")
         except FileNotFoundError:
             # This might happen if process() failed or if the file was deleted externally.
