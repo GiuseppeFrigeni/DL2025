@@ -119,7 +119,7 @@ def main(args):
     IN_CHANNELS = 2
     HIDDEN_CHANNELS = 64 # Example, tune this
     NUM_CLASSES = 6    # For your subset
-    LEARNING_RATE = 1e-3
+    LEARNING_RATE = 5e-4
     EPOCHS = 50 # Increase for the small subset
     WEIGHT_DECAY = 1e-4 # Add some regularization
 
