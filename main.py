@@ -483,14 +483,15 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
-    model =model = GINEGraphClassifier(
+    model = GINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
             edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
             hidden_channels=HIDDEN_DIM,
             out_channels=NUM_CLASSES,
             dropout_gine=DROPOUT_RATE,
             dropout_mlp=DROPOUT_RATE,
-            use_batch_norm=True,  # Enable batch normalization
+            use_batch_norm=use_batch_norm,  # Enable batch normalization
+            num_gine_layers=NUM_GINE_LAYERS
         ).to(device)       
     model.load_state_dict(best_model_state_dict)
 
