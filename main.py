@@ -377,7 +377,6 @@ def main(args):
 
 
         train_dataset = GraphDataset(args.train_path, transform=my_transform)
-        train_dataset, validation_dataset = train_test_split(train_dataset, test_size=0.2, random_state=42)
 
         min_deg, max_deg = get_node_feature_stats(train_dataset, feature_dim=0)
         min_deg_sq, max_deg_sq = get_node_feature_stats(train_dataset, feature_dim=1)
@@ -389,16 +388,16 @@ def main(args):
         if hasattr(train_dataset, 'transform') and train_dataset.transform is not None:
             from torch_geometric.transforms import Compose
             train_dataset.transform = Compose([train_dataset.transform, normalizer])
-            if validation_dataset is not None:
-                validation_dataset.transform = Compose([validation_dataset.transform, normalizer])
             if test_dataset is not None:
                  test_dataset.transform = Compose([test_dataset.transform, normalizer]) # Use TRAIN stats for val/test
         else:
             train_dataset.transform = normalizer
-            if validation_dataset is not None:
-                validation_dataset.transform = normalizer
             if test_dataset is not None:
                 test_dataset.transform = normalizer
+        
+        
+        train_dataset, validation_dataset = train_test_split(train_dataset, test_size=0.2, random_state=42)
+
 
 
         #node_feature_names = ["degree", "degree_squared"]  # Assuming these are the features added by AddDegreeSquaredFeatures
