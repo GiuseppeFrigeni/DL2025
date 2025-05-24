@@ -438,8 +438,8 @@ def main(args):
         criterion = SCELoss(alpha=1.0, beta=0.5, num_classes=NUM_CLASSES, reduction='mean')
 
 
-        train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-        vali_loader = DataLoader(validation_dataset, batch_size=8, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        vali_loader = DataLoader(validation_dataset, batch_size=32, shuffle=False)
         
         best_accuracy = 0.0
         train_losses = []
