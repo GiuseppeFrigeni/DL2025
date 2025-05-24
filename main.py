@@ -374,6 +374,7 @@ def main(args):
         norm_params = []
         norm_params.append((min_deg, max_deg))
         norm_params.append((min_deg_sq, max_deg_sq))
+        normalizer = NormalizeNodeFeatures(norm_params_list=norm_params)
 
         if hasattr(train_dataset, 'transform') and train_dataset.transform is not None:
             from torch_geometric.transforms import Compose
@@ -385,8 +386,6 @@ def main(args):
             if test_dataset is not None:
                 test_dataset.transform = normalizer
 
-        # Create the normalization transform instance
-        normalizer = NormalizeNodeFeatures(norm_params_list=norm_params)
 
         #node_feature_names = ["zeros"]
         #edge_feature_names = [f"EdgeOriginalFeat_{j}" for j in range(7)] # Example edge feature names
