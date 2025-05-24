@@ -177,11 +177,12 @@ from torch_geometric.data import Data
 
 class GATGraphClassifier(torch.nn.Module):
     def __init__(self, node_feature_dim, hidden_dim, out_channels,
-                 edge_feature_dim, heads=8, dropout=0.6):
+                 edge_feature_dim, heads=8, dropout=0.6, pooling_type='mean'):
         super(GATGraphClassifier, self).__init__()
         self.node_feature_dim = node_feature_dim
         self.dropout = dropout
         self.heads = heads
+        self.pooling_type = pooling_type
 
 
         self.conv1 = GATConv(node_feature_dim, hidden_dim, heads=heads,edge_dim=edge_feature_dim, dropout=dropout)
@@ -197,18 +198,26 @@ class GATGraphClassifier(torch.nn.Module):
 
     def forward(self, data: Data) -> torch.Tensor:
 
-        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
-        print(x.shape)
+        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
         x = x.float()
 
         x = self.conv1(x, edge_index, edge_attr=edge_attr)
-        print(x.shape)
         x = F.elu(x)
 
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv2(x, edge_index, edge_attr=edge_attr)
-        print(x.shape)
         x = F.elu(x)
-        x = self.mlp(x)
+
+        if self.pooling_type == "mean":
+            x_graph = global_mean_pool(x, batch)  # x shape: [total_nodes, features_after_conv2], batch shape: [total_nodes]
+        elif self.pooling_type == "add":
+            x_graph = global_add_pool(x, batch)
+        elif self.pooling_type == "max":
+            x_graph = global_max_pool(x, batch)
+        else:
+            raise ValueError(f"Unsupported pooling type: {self.pooling_type}")
+        
+        print(x_graph.shape)
+        x = self.mlp(x_graph)
         print(x.shape)
         return x
