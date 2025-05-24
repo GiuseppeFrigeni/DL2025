@@ -145,7 +145,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
             pred = output.argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
-                correct += (pred == data.y).sum().item()
+                correct += (pred == data.y.squeeze()).sum().item()
                 total += data.y.size(0)
             
     if calculate_accuracy:
