@@ -130,7 +130,7 @@ def main(args):
         # Remove previous checkpoints for the same test dataset
         for filePath in os.listdir(checkpoints_folder):
             if test_dir_name in filePath:
-                os.remove(filePath)
+                os.remove(os.path.join(checkpoints_folder,filePath))
                 print(f"Removed previous checkpoint: {filePath}")
 
 
