@@ -422,11 +422,13 @@ def main(args):
 
         #model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
         model = GINEGraphClassifier(
-            node_feature_dim=NODE_FEATURE_DIM, # Pass 2 here
-            hidden_dim=HIDDEN_DIM,
+            node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
+            edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
+            hidden_channels=HIDDEN_DIM,
             out_channels=NUM_CLASSES,
-            edge_feature_dim=EDGE_FEATURE_DIM,
-            dropout=DROPOUT_RATE
+            dropout_gine=DROPOUT_RATE,
+            dropout_mlp=DROPOUT_RATE,
+            use_batch_norm=True,  # Enable batch normalization
         ).to(device)    
         
 
@@ -473,13 +475,15 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
-    model = GINEGraphClassifier(
+    model =model = GINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
+            edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
             hidden_channels=HIDDEN_DIM,
             out_channels=NUM_CLASSES,
-            edge_in_channels=EDGE_FEATURE_DIM,
-            dropout_gine=DROPOUT_RATE
-        ).to(device)   
+            dropout_gine=DROPOUT_RATE,
+            dropout_mlp=DROPOUT_RATE,
+            use_batch_norm=True,  # Enable batch normalization
+        ).to(device)       
     model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
