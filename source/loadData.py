@@ -56,14 +56,7 @@ class ProcessedGraphDataset(Dataset):
         return [f'processed_data{self.processed_file_suffix}.pt']
 
     def download(self):
-        if not os.path.exists(self.raw_file_to_process_from):
-            raise FileNotFoundError(f"Original raw data: {self.raw_file_to_process_from}")
-        dummy_raw_path = os.path.join(self.raw_dir, self.raw_file_names[0])
-        if not os.path.exists(dummy_raw_path):
-            if self.log: print(f"Download() creating dummy: {dummy_raw_path}")
-            if not os.path.exists(self.raw_dir): os.makedirs(self.raw_dir, exist_ok=True)
-            with open(dummy_raw_path, 'w') as f: f.write(f"Actual: {self.raw_file_to_process_from}")
-        elif self.log: print(f"Download() dummy exists: {dummy_raw_path}")
+       pass  # No download needed, we assume the raw file is already present
 
     def process(self):
         raw_path_to_use = self.raw_file_to_process_from
