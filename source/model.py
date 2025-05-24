@@ -72,7 +72,8 @@ class GINEGraphClassifier(nn.Module):
                  dropout_mlp: float = 0.5,  # Dropout in the final MLP
                  pooling_type: str = 'mean', # 'mean', 'add', or 'max'
                  eps: float = 0.,            # Epsilon for GIN (0 for GIN, learnable for GINE)
-                 train_eps: bool = False     # Whether epsilon is learnable
+                 train_eps: bool = False,    # Whether epsilon is learnable
+                 use_batch_norm: bool = True, # Whether to use BatchNorm after GINE layers
                 ):
         super(GINEGraphClassifier, self).__init__()
 
@@ -83,8 +84,11 @@ class GINEGraphClassifier(nn.Module):
         self.dropout_gine = dropout_gine
         self.dropout_mlp = dropout_mlp
         self.pooling_type = pooling_type
+        self.use_batch_norm = use_batch_norm
 
         self.gine_layers = nn.ModuleList()
+        if use_batch_norm:
+            self.bn_gine = nn.ModuleList() # Optional: BatchNorm for GINE layers, if needed
 
         # The MLP for GINEConv processes node features.
         # Edge features are summed with node features (after an optional MLP on edge features if you want,
@@ -113,6 +117,8 @@ class GINEGraphClassifier(nn.Module):
             self.gine_layers.append(
                 GINEConv(nn=layer_nn, eps=eps, train_eps=train_eps, edge_dim=edge_in_channels)
             )
+            if use_batch_norm:
+                self.bn_gine.append(nn.BatchNorm1d(hidden_channels)) # Optional: BatchNorm after each GINE layer
 
 
             current_dim = hidden_channels # Output of GINE is hidden_channels
@@ -150,73 +156,58 @@ class GINEGraphClassifier(nn.Module):
         if edge_attr.dtype == torch.long: # Edge attributes are typically float
             edge_attr = edge_attr.float()
 
+        x_current = x
 
-        # Pass through GINE layers
-        for gine_layer in self.gine_layers:
-            x = gine_layer(x, edge_index, edge_attr=edge_attr)
-            x = F.relu(x) # GINE paper often uses ReLU after the layer's MLP and aggregation
-            x = F.dropout(x, p=self.dropout_gine, training=self.training)
+
+        for i in range(self.num_gine_layers):
+            # 1. Apply GINEConv
+            x_after_gine = self.gine_layers[i](x_current, edge_index, edge_attr=edge_attr)
+
+            # 2. Apply BatchNorm1d (if enabled and tensor is not empty)
+            if self.use_batch_norm:
+                if x_after_gine.size(0) > 0: # BN1d requires non-empty input
+                    x_after_bn = self.bn_gine[i](x_after_gine)
+                else:
+                    x_after_bn = x_after_gine # Pass through if empty
+            else:
+                x_after_bn = x_after_gine # Skip BN if not enabled
+            # 3. Apply ReLU
+            x_after_relu = F.relu(x_after_bn)
+
+            # 4. Apply Dropout
+            x_current = F.dropout(x_after_relu, p=self.dropout_gine, training=self.training)
+
+        # Final GNN features before pooling
+        x_gnn_out = x_current
 
         # Graph pooling
-        if batch is None: # Handle single graph case
-            batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
-        
-        x_pooled = self.pool(x, batch)
+        if batch is None: # Handle single graph case not using DataLoader's batching
+            if x_gnn_out.size(0) > 0:
+                batch = torch.zeros(x_gnn_out.size(0), dtype=torch.long, device=x_gnn_out.device)
+            else: # Single graph has 0 nodes
+                # Pooled output should be zeros of appropriate dimension
+                num_graphs_for_pooling = 1
+                x_pooled = torch.zeros((num_graphs_for_pooling, self.gine_output_dim), device=x_gnn_out.device if x_gnn_out.device else 'cpu')
+                out_logits = self.mlp(x_pooled)
+                return out_logits # Early exit for this specific case
+
+        # Handle case where x_gnn_out might be empty (e.g., a batch of empty graphs)
+        if x_gnn_out.size(0) == 0:
+            # This assumes 'batch' correctly identifies the number of graphs.
+            # If batch is also empty or problematic, this needs more robust handling.
+            num_graphs_in_batch = batch.max().item() + 1 if batch is not None and batch.numel() > 0 else 0
+            if num_graphs_in_batch > 0:
+                 x_pooled = torch.zeros((num_graphs_in_batch, self.gine_output_dim), device=x_gnn_out.device if x_gnn_out.device else 'cpu')
+            else: # No graphs in batch, or batch is ill-defined for empty x
+                 # This case should ideally not happen with a standard DataLoader.
+                 # Return empty or appropriately shaped zero tensor if necessary.
+                 return torch.empty((0, self.mlp[-1].out_features), device=x_gnn_out.device if x_gnn_out.device else 'cpu')
+        else:
+            x_pooled = self.pool(x_gnn_out, batch)
+
 
         # Classification
         out_logits = self.mlp(x_pooled)
 
         return out_logits
     
-
-import torch
-import torch.nn.functional as F
-from torch.nn import Embedding, Linear
-from torch_geometric.nn import GATConv
-from torch_geometric.data import Data
-
-class GATGraphClassifier(torch.nn.Module):
-    def __init__(self, node_feature_dim, hidden_dim, out_channels,
-                 edge_feature_dim, heads=8, dropout=0.6, pooling_type='mean'):
-        super(GATGraphClassifier, self).__init__()
-        self.node_feature_dim = node_feature_dim
-        self.dropout = dropout
-        self.heads = heads
-        self.pooling_type = pooling_type
-
-
-        self.conv1 = GATConv(node_feature_dim, hidden_dim, heads=heads,edge_dim=edge_feature_dim, dropout=dropout)
-        self.conv2 = GATConv(hidden_dim * heads, hidden_dim, heads=1, edge_dim=edge_feature_dim, dropout=dropout)
-
-
-        # Classifier MLP
-        self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim // 2 if hidden_dim // 2 > 0 else 1),   
-            nn.ReLU(),
-            nn.Dropout(p=dropout),
-            nn.Linear(hidden_dim // 2 if hidden_dim // 2 > 0 else 1, out_channels)
-        )
-
-    def forward(self, data: Data) -> torch.Tensor:
-
-        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
-        x = x.float()
-
-        x = self.conv1(x, edge_index, edge_attr=edge_attr)
-        x = F.elu(x)
-
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = self.conv2(x, edge_index, edge_attr=edge_attr)
-        x = F.elu(x)
-
-        if self.pooling_type == "mean":
-            x_graph = global_mean_pool(x, batch)  # x shape: [total_nodes, features_after_conv2], batch shape: [total_nodes]
-        elif self.pooling_type == "add":
-            x_graph = global_add_pool(x, batch)
-        elif self.pooling_type == "max":
-            x_graph = global_max_pool(x, batch)
-        else:
-            raise ValueError(f"Unsupported pooling type: {self.pooling_type}")
-        
-        x = self.mlp(x_graph)
-        return x
