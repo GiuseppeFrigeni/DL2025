@@ -125,7 +125,7 @@ def train(data_loader, model, optimizer, criterion, device):
         data = data.to(device)
         optimizer.zero_grad()
         output = model(data)  # Assuming model returns a tuple
-        loss = criterion(output, data.y)
+        loss = criterion(output, data.y.squeeze())
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
