@@ -103,7 +103,8 @@ def main(args):
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
     # Define checkpoint path relative to the script's directory
-    checkpoints_folder = os.path.join(os.getcwd(), "checkpoints", test_dir_name)
+    model_name = "SimpleGCN"  # or "GINConv"
+    checkpoints_folder = os.path.join(os.getcwd(), "checkpoints", test_dir_name, model_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
 
@@ -190,7 +191,7 @@ def main(args):
                 # Save best model
             if train_acc > best_accuracy:
                 best_accuracy = train_acc
-                checkpoint_path = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_epoch_{epoch+1}.pth")
+                checkpoint_path = os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
                 torch.save(model.state_dict(), checkpoint_path)
                 print(f"Best model updated and saved at {checkpoint_path}")
 
