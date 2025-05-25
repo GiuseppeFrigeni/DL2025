@@ -455,7 +455,7 @@ def main(args):
 
         # Training loop
         for epoch in range(EPOCHS):
-                
+            print("TRAIN STARTED")
             train_loss = train(train_loader, model, optimizer, criterion, device, class_weights=class_weights_tensor)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             
