@@ -119,14 +119,14 @@ def plot_training_progress(train_losses, train_accuracies, output_dir):
     plt.close()
 
 
-def train(data_loader, model, optimizer, criterion, device):
+def train(data_loader, model, optimizer, criterion, device, class_weights):
     model.train()
     total_loss = 0
     for data in data_loader:
         data = data.to(device)
         optimizer.zero_grad()
         output = model(data)  # Assuming model returns a tuple
-        loss = criterion(output, data.y.squeeze())
+        loss = criterion(output, data.y.squeeze(), class_weights=class_weights)
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
@@ -489,7 +489,7 @@ def main(args):
         # Training loop
         for epoch in range(EPOCHS):
                 
-            train_loss = train(train_loader, model, optimizer, criterion, device)
+            train_loss = train(train_loader, model, optimizer, criterion, device, class_weights=class_weights_tensor)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             
             vali_acc, _ = evaluate(vali_loader, model, device, calculate_accuracy=True)
