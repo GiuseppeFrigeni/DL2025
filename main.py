@@ -470,7 +470,8 @@ def main(args):
         
 
         
-        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=25, verbose=True)
         #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
         criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
 
@@ -500,6 +501,7 @@ def main(args):
             if (epoch + 1) % 10 == 0:
                 logging.info(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {vali_acc:.4f}")
 
+            scheduler.step(vali_acc)  # Step scheduler based on validation accuracy
                 # Save best model
             if vali_acc > best_accuracy:
                 best_accuracy = vali_acc
