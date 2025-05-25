@@ -321,6 +321,8 @@ def get_feature_statistics(dataset: Union[Dataset, List[Data]], batch_size: int 
 def main(args):
     seed_everything(42)  # Set random seed for reproducibility
 
+    model_name = 'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
+    
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
@@ -335,7 +337,7 @@ def main(args):
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
     # Define checkpoint path relative to the script's directory
-    model_name = 'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
+    
     checkpoints_folder = os.path.join(os.getcwd(), "saved_models", test_dir_name, model_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
