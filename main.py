@@ -358,7 +358,7 @@ def main(args):
         print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
 
-    test_dataset = GraphDataset(args.test_path, pre_transform=my_transform, force_reload=True)
+    test_dataset = GraphDataset(args.test_path, pre_transform=my_transform, force_reload=False)
     print(test_dataset[0])
 
     if args.train_path:
@@ -372,7 +372,7 @@ def main(args):
                 print(f"Removed previous checkpoint: {filePath}")
 
 
-        train_dataset = GraphDataset(args.train_path, pre_transform=my_transform, force_reload=True)
+        train_dataset = GraphDataset(args.train_path, pre_transform=my_transform, force_reload=False)
 
         min_deg, max_deg = get_node_feature_stats(train_dataset, feature_dim=0)
         min_deg_sq, max_deg_sq = get_node_feature_stats(train_dataset, feature_dim=1)
