@@ -373,7 +373,7 @@ def main(args):
 
 
         train_dataset = GraphDataset(args.train_path, pre_transform=my_transform, force_reload=True)
-        
+
         min_deg, max_deg = get_node_feature_stats(train_dataset, feature_dim=0)
         min_deg_sq, max_deg_sq = get_node_feature_stats(train_dataset, feature_dim=1)
         min_cc, max_cc = get_node_feature_stats(train_dataset, feature_dim=2)
@@ -455,7 +455,6 @@ def main(args):
 
         # Training loop
         for epoch in range(EPOCHS):
-            print("TRAIN STARTED")
             train_loss = train(train_loader, model, optimizer, criterion, device, class_weights=class_weights_tensor)
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
             
