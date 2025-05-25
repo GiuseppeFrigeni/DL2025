@@ -158,8 +158,13 @@ class GINEGraphClassifier(nn.Module):
 
         x_current = x
 
+        x_after_first_gine = self.gine_layers[0](x_current, edge_index, edge_attr=edge_attr)
+        if self.use_batch_norm: x_after_first_gine = self.bn_gine[0](x_after_first_gine) if x_after_first_gine.size(0) > 0 else x_after_first_gine
+        x_current = F.relu(x_after_first_gine)
+        x_current = F.dropout(x_current, p=self.dropout_gine, training=self.training)
 
-        for i in range(self.num_gine_layers):
+        for i in range(1, self.num_gine_layers):
+            x_identity = x_current
             # 1. Apply GINEConv
             x_after_gine = self.gine_layers[i](x_current, edge_index, edge_attr=edge_attr)
 
@@ -175,7 +180,9 @@ class GINEGraphClassifier(nn.Module):
             x_after_relu = F.relu(x_after_bn)
 
             # 4. Apply Dropout
-            x_current = F.dropout(x_after_relu, p=self.dropout_gine, training=self.training)
+            x_processed = F.dropout(x_after_relu, p=self.dropout_gine, training=self.training)
+
+            x_current = x_identity + x_processed
 
         # Final GNN features before pooling
         x_gnn_out = x_current
