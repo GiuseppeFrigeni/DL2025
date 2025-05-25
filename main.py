@@ -361,7 +361,8 @@ def main(args):
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE = 0.6
-    use_batch_norm = True  # Enable batch normalization in the model
+    use_batch_norm = True
+    TRAIN_EPS = True  # Enable batch normalization in the model
 
     if test_dir_name == "A":
         print("Using configuration for test set A")
@@ -465,13 +466,14 @@ def main(args):
             dropout_gine=DROPOUT_RATE,
             dropout_mlp=DROPOUT_RATE,
             use_batch_norm=use_batch_norm,  # Enable batch normalization
-            num_gine_layers=NUM_GINE_LAYERS
+            num_gine_layers=NUM_GINE_LAYERS,
+            train_eps=TRAIN_EPS
         ).to(device)    
         
 
         
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=10, min_lr=1e-6)
+        #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=10, min_lr=1e-6)
         #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
         criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
 
@@ -501,7 +503,7 @@ def main(args):
             if (epoch + 1) % 10 == 0:
                 logging.info(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {vali_acc:.4f}")
 
-            scheduler.step(vali_acc)  # Step scheduler based on validation accuracy
+            #scheduler.step(vali_acc)  # Step scheduler based on validation accuracy
                 # Save best model
             if vali_acc > best_accuracy:
                 best_accuracy = vali_acc
@@ -522,7 +524,8 @@ def main(args):
             dropout_gine=DROPOUT_RATE,
             dropout_mlp=DROPOUT_RATE,
             use_batch_norm=use_batch_norm,  # Enable batch normalization
-            num_gine_layers=NUM_GINE_LAYERS
+            num_gine_layers=NUM_GINE_LAYERS,
+            train_eps=TRAIN_EPS
         ).to(device)       
     model.load_state_dict(best_model_state_dict)
 
