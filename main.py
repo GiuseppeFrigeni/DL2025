@@ -6,7 +6,7 @@ import argparse
 from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
-from source.transforms import AddDegreeSquaredFeatures
+from source.transforms import StructuralFeatures, NormalizeNodeFeatures
 from source.model import SimpleGCN, GINEGraphClassifier
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -57,41 +57,6 @@ def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     # return mean_val, std_val
     #print(f"Stats for dim {feature_dim}: Min={min_val.item()}, Max={max_val.item()}")
     return min_val, max_val
-
-
-# --- Step 2: Create a Transform to Apply Normalization ---
-class NormalizeNodeFeatures(BaseTransform):
-    def __init__(self, norm_params_list):
-        """
-        Args:
-            norm_params_list: A list of tuples, where each tuple contains
-                              (min_val, max_val) for a feature dimension.
-                              Or (mean_val, std_val) if doing standardization.
-        """
-        super().__init__()
-        self.norm_params_list = norm_params_list
-
-    def __call__(self, data: Data):
-        if data.x is not None and data.x.numel() > 0:
-            x_normalized = data.x.clone() # Important to clone to avoid modifying original in-place if not desired
-            for dim_idx, params in enumerate(self.norm_params_list):
-                if dim_idx < x_normalized.shape[1]: # Check if feature dimension exists
-                    min_val, max_val = params
-                    # Min-Max Normalization
-                    if (max_val - min_val) > 1e-6: # Avoid division by zero
-                        x_normalized[:, dim_idx] = (x_normalized[:, dim_idx] - min_val) / (max_val - min_val)
-                    else: # If max == min, set to 0 or 0.5, or handle as needed
-                        x_normalized[:, dim_idx] = 0.0
-                    
-                    # For Standardization:
-                    # mean_val, std_val = params
-                    # if std_val > 1e-6: # Avoid division by zero
-                    #     x_normalized[:, dim_idx] = (x_normalized[:, dim_idx] - mean_val) / std_val
-                    # else:
-                    #     x_normalized[:, dim_idx] = 0.0 # Or just (x - mean_val)
-
-            data.x = x_normalized
-        return data
 
 
 def plot_training_progress(train_losses, train_accuracies, output_dir):
@@ -348,7 +313,7 @@ def main(args):
 
 
     #transfrm
-    my_transform = AddDegreeSquaredFeatures()
+    my_transform = StructuralFeatures()
 
      # Number of GINE layers in the model
     NUM_CLASSES = 6    # For your subset
@@ -357,7 +322,7 @@ def main(args):
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5   # Weight for Reverse Cross Entropy
-    NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
+    NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE = 0.6
@@ -367,8 +332,8 @@ def main(args):
     if test_dir_name == "A":
         print("Using configuration for test set A")
         BATCH_SIZE = 32
-        NUM_GINE_LAYERS = 3
-        HIDDEN_DIM = 64
+        NUM_GINE_LAYERS = 2
+        HIDDEN_DIM = 128
         print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
     elif test_dir_name == "B":
@@ -411,9 +376,11 @@ def main(args):
 
         min_deg, max_deg = get_node_feature_stats(train_dataset, feature_dim=0)
         min_deg_sq, max_deg_sq = get_node_feature_stats(train_dataset, feature_dim=1)
+        min_cc, max_cc = get_node_feature_stats(train_dataset, feature_dim=2)
         norm_params = []
         norm_params.append((min_deg, max_deg))
         norm_params.append((min_deg_sq, max_deg_sq))
+        norm_params.append((min_cc, max_cc))
         normalizer = NormalizeNodeFeatures(norm_params_list=norm_params)
 
         if hasattr(train_dataset, 'transform') and train_dataset.transform is not None:
