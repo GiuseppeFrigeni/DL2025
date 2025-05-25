@@ -374,7 +374,7 @@ def main(args):
     elif test_dir_name == "B":
         print("Using configuration for test set B")
         BATCH_SIZE = 8
-        NUM_GINE_LAYERS = 1
+        NUM_GINE_LAYERS = 2
         HIDDEN_DIM = 64
         print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
