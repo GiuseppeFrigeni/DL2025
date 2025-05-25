@@ -355,13 +355,16 @@ def main(args):
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5   # Weight for Reverse Cross Entropy
-    HIDDEN_DIM = 64
+    HIDDEN_DIM = 128
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE = 0.5
     BATCH_SIZE = 32
     use_batch_norm = True  # Enable batch normalization in the model
+
+    if test_dir_name == "B":
+        BATCH_SIZE = 16
 
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
     print(test_dataset[0])
