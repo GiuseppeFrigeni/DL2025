@@ -325,35 +325,35 @@ def main(args):
     NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.3
+    DROPOUT_RATE = 0.5
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
 
     if test_dir_name == "A":
         print("Using configuration for test set A")
         BATCH_SIZE = 32
-        NUM_GINE_LAYERS = 3
+        NUM_GINE_LAYERS = 2
         HIDDEN_DIM = 128
         print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
     elif test_dir_name == "B":
         print("Using configuration for test set B")
         BATCH_SIZE = 8
-        NUM_GINE_LAYERS = 3
+        NUM_GINE_LAYERS = 2
         HIDDEN_DIM = 128
         print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
     elif test_dir_name == "C":
         print("Using configuration for test set C")
         BATCH_SIZE = 32
-        NUM_GINE_LAYERS = 3
+        NUM_GINE_LAYERS = 2
         HIDDEN_DIM = 128
         print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
     elif test_dir_name == "D":
         print("Using configuration for test set D")
         BATCH_SIZE = 32
-        NUM_GINE_LAYERS = 3
+        NUM_GINE_LAYERS = 2
         HIDDEN_DIM = 128
         print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
