@@ -366,24 +366,28 @@ def main(args):
         BATCH_SIZE = 32
         NUM_GINE_LAYERS = 3 
         HIDDEN_DIM = 128
+        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
     elif test_dir_name == "B":
         print("Using configuration for test set B")
         BATCH_SIZE = 16
         NUM_GINE_LAYERS = 1
         HIDDEN_DIM = 128
+        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
     elif test_dir_name == "C":
         print("Using configuration for test set C")
         BATCH_SIZE = 32
         NUM_GINE_LAYERS = 2
         HIDDEN_DIM = 128
+        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
     elif test_dir_name == "D":
         print("Using configuration for test set D")
         BATCH_SIZE = 32
         NUM_GINE_LAYERS = 2
         HIDDEN_DIM = 128
+        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
 
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
