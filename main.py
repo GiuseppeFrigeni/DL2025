@@ -330,7 +330,7 @@ def main(args):
     # Define log file path relative to the script's directory
     logs_folder = os.path.join(os.getcwd(), "logs", test_dir_name)
     log_file = os.path.join(logs_folder, "training.log")
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    os.makedirs(os.path.dirname(logs_folder), exist_ok=True)
     logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
@@ -348,23 +348,43 @@ def main(args):
     #transfrm
     my_transform = AddDegreeSquaredFeatures()
 
-    NUM_GINE_LAYERS = 3  # Number of GINE layers in the model
+     # Number of GINE layers in the model
     NUM_CLASSES = 6    # For your subset
     LEARNING_RATE = 5e-4
     EPOCHS = 200 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5   # Weight for Reverse Cross Entropy
-    HIDDEN_DIM = 128
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE = 0.5
-    BATCH_SIZE = 32
     use_batch_norm = True  # Enable batch normalization in the model
 
-    if test_dir_name == "B":
+    if test_dir_name == "A":
+        print("Using configuration for test set A")
+        BATCH_SIZE = 32
+        NUM_GINE_LAYERS = 3 
+        HIDDEN_DIM = 128
+
+    elif test_dir_name == "B":
+        print("Using configuration for test set B")
         BATCH_SIZE = 16
+        NUM_GINE_LAYERS = 1
+        HIDDEN_DIM = 128
+
+    elif test_dir_name == "C":
+        print("Using configuration for test set C")
+        BATCH_SIZE = 32
+        NUM_GINE_LAYERS = 2
+        HIDDEN_DIM = 128
+
+    elif test_dir_name == "D":
+        print("Using configuration for test set D")
+        BATCH_SIZE = 32
+        NUM_GINE_LAYERS = 2
+        HIDDEN_DIM = 128
+
 
     test_dataset = GraphDataset(args.test_path, transform=my_transform)
     print(test_dataset[0])
