@@ -360,7 +360,7 @@ def main(args):
     NODE_FEATURE_DIM = 2    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.5
+    DROPOUT_RATE = 0.6
     use_batch_norm = True  # Enable batch normalization in the model
 
     if test_dir_name == "A":
