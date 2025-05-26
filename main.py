@@ -326,13 +326,16 @@ def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, crite
         remember_indices_2 = sorted_indices_2[:num_remember]
         
         # --- Co-teaching+ Disagreement (Optional, makes it Co-teaching+) ---
-        # agree = (logits1.argmax(dim=1) == logits2.argmax(dim=1))
-        # disagree_indices_1 = remember_indices_1[~agree[remember_indices_1]] # Model1's small loss where they disagree
-        # disagree_indices_2 = remember_indices_2[~agree[remember_indices_2]] # Model2's small loss where they disagree
+        agree = (logits1.argmax(dim=1) == logits2.argmax(dim=1))
+        disagree_indices_1 = remember_indices_1[~agree[remember_indices_1]] # Model1's small loss where they disagree
+        disagree_indices_2 = remember_indices_2[~agree[remember_indices_2]] # Model2's small loss where they disagree
         # If using Co-teaching+: use disagree_indices_1 for model2 update, disagree_indices_2 for model1 update
         # If not using Co-teaching+: use remember_indices_1 for model2, remember_indices_2 for model1
         # For simplicity, let's stick to standard Co-teaching here.
         # ------------------------------------------------------------------
+
+        remember_indices_1 = disagree_indices_1
+        remember_indices_2 = disagree_indices_2
 
         # Update model1 using samples selected by model2
         if len(remember_indices_2) > 0:
@@ -430,7 +433,7 @@ def main(args):
     NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.5
+    DROPOUT_RATE = 0.75
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
     FORGET_RATE = 0.2 # Example: percentage of samples to potentially drop (1 - remember_rate)
