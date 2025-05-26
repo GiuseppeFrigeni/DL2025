@@ -282,7 +282,7 @@ def get_feature_statistics(dataset: Union[Dataset, List[Data]], batch_size: int 
     else:
         print("\nNo labels (data.y) found in the dataset.")
 
-def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, criterion_no_reduction, epoch, num_epochs, device, forget_rate_schedule):
+def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, criterion_no_reduction, criterion, class_weights, epoch, num_epochs, device, forget_rate_schedule):
     model1.train()
     model2.train()
 
@@ -339,7 +339,7 @@ def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, crite
             logits1_selected = logits1[remember_indices_2]
             labels_selected_for_1 = labels[remember_indices_2]
             # Use your main SCE loss with reduction='mean' for the update
-            loss1_update = F.cross_entropy(logits1_selected, labels_selected_for_1) # Or your SCE(reduction='mean')
+            loss1_update = criterion(logits1_selected, labels_selected_for_1, class_weights=class_weights) # Or your SCE(reduction='mean')
             
             optimizer1.zero_grad()
             loss1_update.backward()
@@ -351,7 +351,7 @@ def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, crite
             logits2_selected = logits2[remember_indices_1]
             labels_selected_for_2 = labels[remember_indices_1]
             # Use your main SCE loss with reduction='mean' for the update
-            loss2_update = F.cross_entropy(logits2_selected, labels_selected_for_2) # Or your SCE(reduction='mean')
+            loss2_update = criterion(logits2_selected, labels_selected_for_2, class_weights=class_weights) # Or your SCE(reduction='mean')
 
             optimizer2.zero_grad()
             loss2_update.backward()
@@ -599,7 +599,7 @@ def main(args):
         # Training loop
         for epoch in range(EPOCHS):
             avg_loss1, avg_loss2 = train_coteaching(train_loader, model1, model2, optimizer1, optimizer2,
-                    criterion, epoch, EPOCHS, device, forget_rate_schedule)
+                    criterion, criterion_val, class_weights_tensor, epoch, EPOCHS, device, forget_rate_schedule)
             print(f"Epoch {epoch+1}/{EPOCHS} - Model1 Avg Loss: {avg_loss1:.4f}, Model2 Avg Loss: {avg_loss2:.4f}")
             
             # --- Validation ---
@@ -610,11 +610,11 @@ def main(args):
             # Evaluate model2 on val_loader
             val_acc2, _ = evaluate(vali_loader, model2, device, calculate_accuracy=True)
 
-            print(f"Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
+            print(f"Epoch {epoch+1}/{EPOCHS} - Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
 
             best_overall_val_acc = 0
             # Save best model based on val_acc1 or val_acc2 (or average, or max)
-            current_best_val_acc = max(val_acc1, val_acc2) # Example
+            current_best_val_acc = (val_acc1 + val_acc2)/2 # Example
             if current_best_val_acc > best_overall_val_acc:
                 best_overall_val_acc = current_best_val_acc
                 checkpoint_path = os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
