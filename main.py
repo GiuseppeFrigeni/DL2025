@@ -381,7 +381,7 @@ def test_ensemble_softmax_avg(test_loader, model1, model2, device):
 
             logits = (logits1 + logits2) / 2.0
             pred = logits.argmax(dim=1)  # Ensure logits are in the right shape
-
+            print(logits)
             predictions.extend(pred.cpu().numpy())  # Collect predictions
         
     return  predictions # Return predictions as numpy array
