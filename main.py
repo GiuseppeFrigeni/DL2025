@@ -604,11 +604,11 @@ def main(args):
             
             # --- Validation ---
             # Evaluate model1 on val_loader
-            val_acc1, _ = evaluate(vali_loader, model1, device) # criterion_val uses reduction='mean'
+            val_acc1, _ = evaluate(vali_loader, model1, device, calculate_accuracy=True) # criterion_val uses reduction='mean'
             
 
             # Evaluate model2 on val_loader
-            val_acc2, _ = evaluate(vali_loader, model2, device)
+            val_acc2, _ = evaluate(vali_loader, model2, device, calculate_accuracy=True)
 
             print(f"Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
     
