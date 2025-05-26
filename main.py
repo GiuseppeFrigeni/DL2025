@@ -433,7 +433,7 @@ def main(args):
     NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.75
+    DROPOUT_RATE = 0.6
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
     FORGET_RATE = 0 # Example: percentage of samples to potentially drop (1 - remember_rate)
