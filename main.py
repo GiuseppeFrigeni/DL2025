@@ -325,7 +325,7 @@ def main(args):
     TRAIN_EPS = True  # Enable batch normalization in the model
 
     HIDDEN_DIM = 128 # Hidden dimension for GAT layers
-    BATCH_SIZE = 32
+    BATCH_SIZE = 8
     NUM_GINE_LAYERS = 2 # Number of GINE layers in the model
     if test_dir_name == 'B':
         BATCH_SIZE = 8
