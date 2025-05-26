@@ -287,7 +287,7 @@ def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, crite
     model2.train()
 
     current_forget_rate = forget_rate_schedule[epoch] # Get forget rate for current epoch
-    print(f"Epoch {epoch+1}/{num_epochs}, Current Forget Rate: {current_forget_rate:.4f}")
+    #print(f"Epoch {epoch+1}/{num_epochs}, Current Forget Rate: {current_forget_rate:.4f}")
 
     total_loss1 = 0
     total_loss2 = 0
