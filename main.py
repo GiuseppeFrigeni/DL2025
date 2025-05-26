@@ -318,14 +318,14 @@ def main(args):
      # Number of GINE layers in the model
     NUM_CLASSES = 6    # For your subset
     LEARNING_RATE = 5e-4
-    EPOCHS = 200 
+    EPOCHS = 300 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5   # Weight for Reverse Cross Entropy
     NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.5
+    DROPOUT_RATE = 0.75
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
 
