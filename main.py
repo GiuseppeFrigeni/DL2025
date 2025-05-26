@@ -278,8 +278,6 @@ def get_feature_statistics(dataset: Union[Dataset, List[Data]], batch_size: int 
     else:
         print("\nNo labels (data.y) found in the dataset.")
 
-
-
 def main(args):
     seed_everything(42)  # Set random seed for reproducibility
 
@@ -321,8 +319,8 @@ def main(args):
     NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE_MLP = 0.5
-    DROPOUT_RATE_GINE = 0.3
+    DROPOUT_RATE_MLP = 0.6
+    DROPOUT_RATE_GINE = 0.6
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
 

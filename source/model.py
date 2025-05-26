@@ -299,10 +299,10 @@ class EnhancedGINEGraphClassifier(nn.Module):
         for i in range(num_gine_layers):
             # More sophisticated MLP for GINEConv
             layer_nn = nn.Sequential(
-                nn.Linear(current_dim, hidden_channels * 2),
+                nn.Linear(current_dim, hidden_channels),
                 nn.ReLU(),
                 nn.Dropout(0.1),
-                nn.Linear(hidden_channels * 2, hidden_channels),
+                nn.Linear(hidden_channels, hidden_channels),
                 nn.ReLU(),
                 nn.Linear(hidden_channels, hidden_channels),
             )
