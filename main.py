@@ -370,6 +370,7 @@ def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, crite
 def test_ensemble_softmax_avg(test_loader, model1, model2, device):
     model1.eval()
     model2.eval()
+    predictions = []
     with torch.no_grad():
         for data in test_loader:
             data = data.to(device)
@@ -383,8 +384,9 @@ def test_ensemble_softmax_avg(test_loader, model1, model2, device):
             avg_probs = (probs1 + probs2) / 2.0
             
             pred = torch.argmax(avg_probs, dim=-1)
+            predictions.extend(pred.cpu().numpy())  # Collect predictions
         
-    return pred.cpu().numpy()  # Return predictions as numpy array
+    return  predictions # Return predictions as numpy array
 
 
 def main(args):
