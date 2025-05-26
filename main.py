@@ -611,7 +611,8 @@ def main(args):
             val_acc2, _ = evaluate(vali_loader, model2, device, calculate_accuracy=True)
 
             print(f"Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
-    
+
+            best_overall_val_acc = 0
             # Save best model based on val_acc1 or val_acc2 (or average, or max)
             current_best_val_acc = max(val_acc1, val_acc2) # Example
             if current_best_val_acc > best_overall_val_acc:
