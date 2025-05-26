@@ -26,8 +26,6 @@ import torch.nn.functional as F
 from torch.utils.data import Subset
 
 
-torch.backends.cuda.matmul.allow_tf32 = True  # Default False in PyTorch 1.12+
-torch.backends.cudnn.allow_tf32 = True  # Default True
 
 def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     """
@@ -324,7 +322,7 @@ def main(args):
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
 
-    HIDDEN_DIM = 128 # Hidden dimension for GAT layers
+    HIDDEN_DIM = 64 # Hidden dimension for GAT layers
     BATCH_SIZE = 8
     NUM_GINE_LAYERS = 2 # Number of GINE layers in the model
     if test_dir_name == 'B':
