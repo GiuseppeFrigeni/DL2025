@@ -81,7 +81,7 @@ def plot_training_progress(train_losses, train_accuracies, output_dir):
     plt.close()
 
 
-def train(data_loader, model, optimizer, criterion, device, class_weights):
+def train(data_loader, model, optimizer, criterion, device, class_weights=None):
     model.train()
     total_loss = 0
     for data in data_loader:
@@ -432,7 +432,7 @@ def main(args):
 
         # Training loop
         for epoch in range(EPOCHS):
-            train_loss = train(train_loader, model, optimizer, criterion, device, class_weights_tensor)
+            train_loss = train(train_loader, model, optimizer, criterion, device)
             
             # --- Validation ---
             # Evaluate model1 on val_loader
