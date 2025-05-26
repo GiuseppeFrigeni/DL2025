@@ -559,7 +559,7 @@ def main(args):
     use_edge_attr_in_gat=True, # Try with and without
     add_self_loops_gat=True,
     use_batch_norm=use_batch_norm
-)
+).to(device)
         model2 = GATv2GraphClassifier(
             node_in_channels=NODE_FEATURE_DIM,
     edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
@@ -575,7 +575,7 @@ def main(args):
     use_edge_attr_in_gat=True, # Try with and without
     add_self_loops_gat=True,
     use_batch_norm=use_batch_norm
-)
+).to(device)
 
 
         
