@@ -392,7 +392,7 @@ def test_ensemble_softmax_avg(test_loader, model1, model2, device):
 def main(args):
     seed_everything(42)  # Set random seed for reproducibility
 
-    model_name = 'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
+    model_name = 'GATv2GraphClassifier' #'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
@@ -560,17 +560,22 @@ def main(args):
     add_self_loops_gat=True,
     use_batch_norm=use_batch_norm
 )
-        model2 = GINEGraphClassifier(
-            node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
-            edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
-            hidden_channels=HIDDEN_DIM,
-            out_channels=NUM_CLASSES,
-            dropout_gine=DROPOUT_RATE,
-            dropout_mlp=DROPOUT_RATE,
-            use_batch_norm=use_batch_norm,  # Enable batch normalization
-            num_gine_layers=NUM_GINE_LAYERS,
-            train_eps=TRAIN_EPS
-        ).to(device)
+        model2 = GATv2GraphClassifier(
+            node_in_channels=NODE_FEATURE_DIM,
+    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
+    hidden_channels=HIDDEN_DIM,
+    out_channels=NUM_CLASSES,
+    num_gat_layers=2,
+    gat_heads=8, # Example: 8 heads for intermediate layers
+    gat_dropout=DROPOUT_RATE,
+    output_heads=1, # Example: 1 head for the last layer, averaged
+    concat_output_heads=False, # Average heads in the last layer
+    dropout_mlp=DROPOUT_RATE,
+    pooling_type='mean',
+    use_edge_attr_in_gat=True, # Try with and without
+    add_self_loops_gat=True,
+    use_batch_norm=use_batch_norm
+)
 
 
         
