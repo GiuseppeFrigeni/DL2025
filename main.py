@@ -381,7 +381,6 @@ def test_ensemble_softmax_avg(test_loader, model1, model2, device):
 
             logits = (logits1 + logits2) / 2.0
             pred = logits.argmax(dim=1)  # Ensure logits are in the right shape
-            print(logits)
             predictions.extend(pred.cpu().numpy())  # Collect predictions
         
     return  predictions # Return predictions as numpy array
@@ -622,7 +621,7 @@ def main(args):
                 best_epoch_2 = epoch + 1
                 checkpoint_path = os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{best_epoch_2}.pth")
                 torch.save(model2.state_dict(), checkpoint_path)
-                print(f"Saved new best model_2 at epoch {best_epoch_2} with val acc {best_val_acc_2:.4f}")
+                print(f"+++++ Saved new best model_2 at epoch {best_epoch_2} with val acc {best_val_acc_2:.4f}")
 
 
             if (epoch + 1) % 10 == 0:
