@@ -7,7 +7,7 @@ from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import StructuralFeatures, NormalizeNodeFeatures
-from source.model import SimpleGCN, GINEGraphClassifier, EnhancedGINEGraphClassifier
+from source.model import SimpleGCN, GINEGraphClassifier, EnhancedGINEGraphClassifier, NNConvNet
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -320,7 +320,7 @@ def main(args):
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE_MLP = 0.6
-    DROPOUT_RATE_GINE = 0.6
+    DROPOUT_RATE_GINE = 0.5
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
 
@@ -395,17 +395,13 @@ def main(args):
         
 
         #model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
-        model =  EnhancedGINEGraphClassifier(
+        model =  NNConvNet(
             node_in_channels=NODE_FEATURE_DIM,
-    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
+    edge_feature_dim=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
     hidden_channels=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
-    num_gine_layers=NUM_GINE_LAYERS,
-    dropout_gine=DROPOUT_RATE_GINE,
-    dropout_mlp=DROPOUT_RATE_MLP,
-    pooling_type='attention',
-    train_eps=TRAIN_EPS, 
-    use_batch_norm=use_batch_norm
+    num_layers=NUM_GINE_LAYERS,
+    dropout=DROPOUT_RATE_GINE,
     ).to(device)
 
         
@@ -457,17 +453,13 @@ def main(args):
     best_epoch = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{best_epoch}.pth"))
     print(f"Loading best model from epoch {best_epoch} for model")
-    model = EnhancedGINEGraphClassifier(
+    model =  NNConvNet(
             node_in_channels=NODE_FEATURE_DIM,
-    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
+    edge_feature_dim=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
     hidden_channels=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
-    num_gine_layers=NUM_GINE_LAYERS,
-    dropout_gine=DROPOUT_RATE_GINE,
-    dropout_mlp=DROPOUT_RATE_MLP,
-    pooling_type='attention',
-    train_eps=TRAIN_EPS, # Enable batch normalization in the model
-    use_batch_norm=use_batch_norm
+    num_layers=NUM_GINE_LAYERS,
+    dropout=DROPOUT_RATE_GINE,
     ).to(device)
 
     model.load_state_dict(best_model_state_dict)
