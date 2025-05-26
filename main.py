@@ -614,7 +614,7 @@ def main(args):
                 best_epoch_1 = epoch + 1
                 checkpoint_path = os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{best_epoch_1}.pth")
                 torch.save(model1.state_dict(), checkpoint_path) # Or save the better of the two
-                print(f"Saved new best model_1 at epoch {best_epoch_1} with val acc {best_val_acc_1:.4f}")
+                print(f"+++++ Saved new best model_1 at epoch {best_epoch_1} with val acc {best_val_acc_1:.4f}")
             
             if val_acc2 > best_val_acc_2:
                 best_val_acc_2 = val_acc2
