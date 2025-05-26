@@ -436,7 +436,7 @@ def main(args):
     DROPOUT_RATE = 0.6
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
-    FORGET_RATE = 0 # Example: percentage of samples to potentially drop (1 - remember_rate)
+    FORGET_RATE = 0.1 # Example: percentage of samples to potentially drop (1 - remember_rate)
                   # Adjust this based on estimated noise rate. If noise is 40%, forget_rate could be 0.4.
     NUM_GRADUAL = 10 # Number of epochs for gradually increasing forget_rate (optional, from paper)
                  # e.g., start with forget_rate=0 and increase to target FORGET_RATE over NUM_GRADUAL epochs
