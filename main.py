@@ -580,7 +580,8 @@ def main(args):
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
         vali_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
         
-        best_accuracy = 0.0
+        best_val_acc_1 = 0
+        best_val_acc_2 = 0
         train_losses = []
         train_accuracies = []
         vali_accuracies = []
@@ -607,8 +608,7 @@ def main(args):
 
             print(f"Epoch {epoch+1}/{EPOCHS} - Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
 
-            best_val_acc_1 = 0
-            best_val_acc_2 = 0
+
             # Save best model based on val_acc1 or val_acc2 (or average, or max)
             if val_acc1 > best_val_acc_1:
                 best_val_acc_1 = val_acc1
