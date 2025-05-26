@@ -218,182 +218,271 @@ class GINEGraphClassifier(nn.Module):
 
         return out_logits
     
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATv2Conv, global_mean_pool, global_add_pool, global_max_pool
+from torch_geometric.nn import GINEConv, global_mean_pool, global_max_pool, global_add_pool
 from torch_geometric.data import Data
+import math
 
-class GATv2GraphClassifier(nn.Module):
-    def __init__(self, node_in_channels: int, edge_in_channels: int, # edge_in_channels can be 0 if not using edge_attr
+class AttentionPooling(nn.Module):
+    def __init__(self, input_dim, hidden_dim=None):
+        super().__init__()
+        if hidden_dim is None:
+            hidden_dim = input_dim // 2
+        
+        self.attention = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1)
+        )
+    
+    def forward(self, x, batch):
+        # Compute attention weights
+        attention_weights = self.attention(x)  # [num_nodes, 1]
+        attention_weights = torch.softmax(attention_weights, dim=0)
+        
+        # Apply attention-weighted pooling
+        weighted_x = x * attention_weights
+        return global_add_pool(weighted_x, batch)
+
+class EnhancedGINEGraphClassifier(nn.Module):
+    def __init__(self, node_in_channels: int, edge_in_channels: int,
                  hidden_channels: int, out_channels: int,
-                 num_gat_layers: int = 2,
-                 gat_heads: int = 4, # Number of attention heads
-                 gat_dropout: float = 0.6, # Dropout in GATConv (applied to attention scores and node features)
-                 output_heads: int = 1, # Heads for the last GAT layer, usually 1 for classification if not concatenating
-                 concat_output_heads: bool = False, # If True, last layer output is heads * hidden_channels. If False, it's averaged.
+                 num_gine_layers: int = 2,
+                 dropout_gine: float = 0.3,  # Reduced dropout
                  dropout_mlp: float = 0.5,
-                 pooling_type: str = 'mean',
-                 use_edge_attr_in_gat: bool = True, # Flag to control using edge_attr in GATv2Conv
-                 add_self_loops_gat: bool = True, # GAT typically requires self-loops
-                 use_batch_norm: bool = True
-                ):
-        super(GATv2GraphClassifier, self).__init__()
+                 pooling_type: str = 'attention',  # 'mean', 'add', 'max', 'attention', 'multi'
+                 eps: float = 0.,
+                 train_eps: bool = True,  # Enable learnable eps
+                 use_batch_norm: bool = True,
+                 use_layer_norm: bool = False,  # Alternative to batch norm
+                 use_residual: bool = True,
+                 edge_mlp_hidden: int = None,  # Hidden dim for edge MLP
+                 virtual_node: bool = False,  # Whether to use a virtual node
+                 ):
+        super(EnhancedGINEGraphClassifier, self).__init__()
 
-        if num_gat_layers < 1:
-            raise ValueError("Number of GAT layers must be at least 1.")
+        if num_gine_layers < 1:
+            raise ValueError("Number of GINE layers must be at least 1.")
 
-        self.num_gat_layers = num_gat_layers
-        self.gat_dropout = gat_dropout
+        self.num_gine_layers = num_gine_layers
+        self.dropout_gine = dropout_gine
         self.dropout_mlp = dropout_mlp
         self.pooling_type = pooling_type
         self.use_batch_norm = use_batch_norm
+        self.use_layer_norm = use_layer_norm
+        self.use_residual = use_residual
+        self.virtual_node = virtual_node
+        
+        # Edge feature preprocessing
+        if edge_mlp_hidden is None:
+            edge_mlp_hidden = max(edge_in_channels * 2, hidden_channels)
+        
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(edge_in_channels, edge_mlp_hidden),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(edge_mlp_hidden, edge_in_channels)
+        )
 
-        self.gat_layers = nn.ModuleList()
-        if self.use_batch_norm:
-            self.bns_gat = nn.ModuleList()
+        self.gine_layers = nn.ModuleList()
+        if use_batch_norm:
+            self.bn_gine = nn.ModuleList()
+        if use_layer_norm:
+            self.ln_gine = nn.ModuleList()
 
         current_dim = node_in_channels
-        gat_edge_dim = edge_in_channels if use_edge_attr_in_gat else None
 
-        for i in range(num_gat_layers):
-            is_last_layer = (i == num_gat_layers - 1)
-            
-            # For the last layer, heads are often set to output_heads (e.g., 1) and output is averaged (concat=False)
-            # unless you specifically want a larger dimension before pooling.
-            current_heads = output_heads if is_last_layer else gat_heads
-            concat_heads = concat_output_heads if is_last_layer else True # Concat for intermediate layers
-
-            # Output dimension of a GAT layer
-            # If concat_heads is True, out_dim = current_heads * hidden_channels
-            # If concat_heads is False, out_dim = hidden_channels
-            # We want the final GAT layer before pooling to output 'hidden_channels' effectively.
-            # So, if concat_heads is True for the last layer, the MLP input needs to adjust.
-            # Let's define GAT output dim to be hidden_channels (meaning if current_heads > 1 and concat=False, GATConv out_channels is hidden_channels)
-            # If concat=True, GATConv out_channels should be hidden_channels / current_heads to make final output hidden_channels
-            
-            # Let GATv2Conv output current_heads * hidden_channels_per_head
-            # We want the effective output after concat/average to be `hidden_channels`
-            if concat_heads:
-                # Ensure hidden_channels is divisible by heads for this setup
-                if hidden_channels % current_heads != 0 and not is_last_layer: # Check for intermediate layers
-                    raise ValueError(f"hidden_channels ({hidden_channels}) must be divisible by gat_heads ({current_heads}) when concat_heads is True for intermediate layers.")
-                out_channels_per_head = hidden_channels // current_heads if not is_last_layer else hidden_channels # Last layer might behave differently if concat_output_heads is True
-                if is_last_layer and concat_output_heads: # If last layer also concatenates
-                    out_channels_per_head = hidden_channels // current_heads # The final MLP input will be hidden_channels
-            else: # Averaging heads
-                out_channels_per_head = hidden_channels
-
-
-            self.gat_layers.append(
-                GATv2Conv(
-                    in_channels=current_dim,
-                    out_channels=out_channels_per_head, # Output channels per head
-                    heads=current_heads,
-                    concat=concat_heads,
-                    dropout=gat_dropout,
-                    add_self_loops=add_self_loops_gat,
-                    edge_dim=gat_edge_dim # Pass edge feature dimension if using them
-                )
+        for i in range(num_gine_layers):
+            # More sophisticated MLP for GINEConv
+            layer_nn = nn.Sequential(
+                nn.Linear(current_dim, hidden_channels * 2),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(hidden_channels * 2, hidden_channels),
+                nn.ReLU(),
+                nn.Linear(hidden_channels, hidden_channels),
             )
-
-            # The effective output dimension after this GAT layer
-            current_dim_after_gat = current_heads * out_channels_per_head if concat_heads else out_channels_per_head
             
-            if self.use_batch_norm:
-                # BN is applied to the output of GAT, which has 'current_dim_after_gat'
-                self.bns_gat.append(nn.BatchNorm1d(current_dim_after_gat))
+            self.gine_layers.append(
+                GINEConv(nn=layer_nn, eps=eps, train_eps=train_eps, edge_dim=edge_in_channels)
+            )
             
-            current_dim = current_dim_after_gat
+            if use_batch_norm:
+                self.bn_gine.append(nn.BatchNorm1d(hidden_channels))
+            if use_layer_norm:
+                self.ln_gine.append(nn.LayerNorm(hidden_channels))
 
-        self.gat_output_dim = current_dim # Dimension before pooling
+            current_dim = hidden_channels
 
+        self.gine_output_dim = current_dim
+
+        # Multiple pooling strategies
         if pooling_type == 'mean':
             self.pool = global_mean_pool
         elif pooling_type == 'add':
             self.pool = global_add_pool
         elif pooling_type == 'max':
             self.pool = global_max_pool
+        elif pooling_type == 'attention':
+            self.pool = AttentionPooling(self.gine_output_dim)
+        elif pooling_type == 'multi':
+            self.pool_mean = global_mean_pool
+            self.pool_max = global_max_pool
+            self.pool_add = global_add_pool
+            self.gine_output_dim = self.gine_output_dim * 3  # Concatenate all three
         else:
             raise ValueError(f"Unsupported pooling type: {pooling_type}")
 
-        # Classifier MLP
-        mlp_hidden_dim = self.gat_output_dim // 2 if self.gat_output_dim // 2 > 0 else 1
-        # If gat_output_dim is small, ensure mlp_hidden_dim is at least 1 or some reasonable value
-        if mlp_hidden_dim == 0 and self.gat_output_dim > 0: mlp_hidden_dim = self.gat_output_dim
-
+        # Enhanced classifier with residual connections - optimized for noisy labels
         mlp_layers = []
-        mlp_layers.append(nn.Linear(self.gat_output_dim, mlp_hidden_dim))
-        if self.use_batch_norm and mlp_hidden_dim > 0 : # Add BN if mlp_hidden_dim is valid
-            mlp_layers.append(nn.BatchNorm1d(mlp_hidden_dim))
-        if mlp_hidden_dim > 0: # Only add ReLU if there's a hidden layer
-            mlp_layers.append(nn.ReLU())
-            mlp_layers.append(nn.Dropout(p=dropout_mlp))
-            mlp_layers.append(nn.Linear(mlp_hidden_dim, out_channels))
-        else: # Direct linear layer if no hidden MLP layer
-            mlp_layers.append(nn.Linear(self.gat_output_dim, out_channels))
-
-
+        current_mlp_dim = self.gine_output_dim
+        
+        # First layer - wider for robustness
+        mlp_layers.extend([
+            nn.Linear(current_mlp_dim, hidden_channels * 2),
+            nn.ReLU(),
+            nn.BatchNorm1d(hidden_channels * 2),
+            nn.Dropout(dropout_mlp * 0.3)  # Lower dropout early
+        ])
+        current_mlp_dim = hidden_channels * 2
+        
+        # Second layer
+        mlp_layers.extend([
+            nn.Linear(current_mlp_dim, hidden_channels),
+            nn.ReLU(),
+            nn.BatchNorm1d(hidden_channels),
+            nn.Dropout(dropout_mlp * 0.5)
+        ])
+        current_mlp_dim = hidden_channels
+        
+        # Third layer - bottleneck before output
+        mlp_layers.extend([
+            nn.Linear(current_mlp_dim, hidden_channels // 2),
+            nn.ReLU(),
+            nn.BatchNorm1d(hidden_channels // 2),
+            nn.Dropout(dropout_mlp)  # Higher dropout before output
+        ])
+        current_mlp_dim = hidden_channels // 2
+        
+        # Output layer with temperature scaling capability
+        mlp_layers.append(nn.Linear(current_mlp_dim, out_channels))
+        
         self.mlp = nn.Sequential(*mlp_layers)
+        
+        # Temperature parameter for calibration
+        self.temperature = nn.Parameter(torch.ones(1))
+        
+        # Jump connections: direct connections from intermediate layers to output
+        self.jump_connections = nn.ModuleList()
+        for i in range(num_gine_layers):
+            self.jump_connections.append(
+                nn.Linear(hidden_channels, hidden_channels // 4)
+            )
+        
+        # Final combination layer for jump connections
+        if num_gine_layers > 1:
+            self.jump_combiner = nn.Linear(
+                self.gine_output_dim + (hidden_channels // 4) * (num_gine_layers - 1),
+                self.gine_output_dim
+            )
 
     def forward(self, data: Data) -> torch.Tensor:
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
 
         if x is None:
-            raise ValueError("Node features 'x' are None. Model requires node features.")
-        if x.dtype != torch.float32:
+            raise ValueError("Node features 'x' are None.")
+        if x.dtype == torch.long:
             x = x.float()
         
-        # Edge attributes for GATv2Conv
-        # If not using edge_attr in GAT, this will be None and GATv2Conv's edge_dim should be None
-        current_edge_attr = None
-        if self.gat_layers[0].edge_dim is not None: # Check if first GAT layer expects edge_attr
-            if edge_attr is None:
-                raise ValueError("Edge attributes 'edge_attr' are None, but GATv2Conv expects them (edge_dim > 0).")
-            if edge_attr.dtype != torch.float32:
-                edge_attr = edge_attr.float()
-            current_edge_attr = edge_attr
-        
+        if edge_attr is None:
+            raise ValueError("Edge attributes 'edge_attr' are None.")
+        if edge_attr.dtype == torch.long:
+            edge_attr = edge_attr.float()
+
+        # Preprocess edge features
+        edge_attr = self.edge_mlp(edge_attr)
+
         x_current = x
+        jump_features = []
 
-        for i in range(self.num_gat_layers):
-            # Apply GATv2Conv
-            # Note: GATv2Conv's dropout is internal. Additional dropout can be applied after activation.
-            x_after_gat = self.gat_layers[i](x_current, edge_index, edge_attr=current_edge_attr)
+        # First layer (no residual)
+        x_after_gine = self.gine_layers[0](x_current, edge_index, edge_attr=edge_attr)
+        x_after_gine = self._apply_normalization(x_after_gine, 0)
+        x_current = F.relu(x_after_gine)
+        x_current = F.dropout(x_current, p=self.dropout_gine, training=self.training)
 
-            if self.use_batch_norm:
-                if x_after_gat.size(0) > 0:
-                    x_after_bn = self.bns_gat[i](x_after_gat)
-                else:
-                    x_after_bn = x_after_gat
-            else:
-                x_after_bn = x_after_gat
+        # Subsequent layers with optional residual connections
+        for i in range(1, self.num_gine_layers):
+            x_identity = x_current
             
-            # GAT often uses LeakyReLU or ELU, but ReLU is also common.
-            # The dropout in GATConv is usually applied to attention weights and features *before* this final activation.
-            x_current = F.elu(x_after_bn) # Using ELU as often seen with GAT
-            # If you want another dropout after activation (less common for GAT layers themselves):
-            # x_current = F.dropout(x_current, p=self.some_other_dropout_if_needed, training=self.training)
+            # GINE layer
+            x_after_gine = self.gine_layers[i](x_current, edge_index, edge_attr=edge_attr)
+            x_after_gine = self._apply_normalization(x_after_gine, i)
+            x_after_relu = F.relu(x_after_gine)
+            x_processed = F.dropout(x_after_relu, p=self.dropout_gine, training=self.training)
 
-        x_gnn_out = x_current
-
-        if batch is None:
-            if x_gnn_out.size(0) > 0:
-                batch = torch.zeros(x_gnn_out.size(0), dtype=torch.long, device=x_gnn_out.device)
+            # Residual connection
+            if self.use_residual:
+                x_current = x_identity + x_processed
             else:
-                num_graphs_for_pooling = 1
-                x_pooled = torch.zeros((num_graphs_for_pooling, self.gat_output_dim), device=x_gnn_out.device if x_gnn_out.device else 'cpu')
-                out_logits = self.mlp(x_pooled)
-                return out_logits
+                x_current = x_processed
+            
+            # Store for jump connections (except the last layer)
+            if i < self.num_gine_layers - 1:
+                jump_features.append(x_current)
 
-        if x_gnn_out.size(0) == 0:
-            num_graphs_in_batch = batch.max().item() + 1 if batch is not None and batch.numel() > 0 else 0
-            if num_graphs_in_batch > 0:
-                 x_pooled = torch.zeros((num_graphs_in_batch, self.gat_output_dim), device=x_gnn_out.device if x_gnn_out.device else 'cpu')
+        # Apply jump connections
+        if len(jump_features) > 0:
+            jump_outputs = []
+            for i, jump_feat in enumerate(jump_features):
+                jump_out = self.jump_connections[i](jump_feat)
+                jump_out = global_mean_pool(jump_out, batch) if hasattr(self, 'pool') else jump_out.mean(0, keepdim=True)
+                jump_outputs.append(jump_out)
+            
+            # Pool final layer
+            if self.pooling_type == 'multi':
+                x_pooled_final = torch.cat([
+                    self.pool_mean(x_current, batch),
+                    self.pool_max(x_current, batch), 
+                    self.pool_add(x_current, batch)
+                ], dim=1)
             else:
-                 return torch.empty((0, self.mlp[-1].out_features), device=x_gnn_out.device if x_gnn_out.device else 'cpu')
+                x_pooled_final = self.pool(x_current, batch)
+            
+            # Combine with jump connections
+            x_combined = torch.cat([x_pooled_final] + jump_outputs, dim=1)
+            x_pooled = self.jump_combiner(x_combined)
         else:
-            x_pooled = self.pool(x_gnn_out, batch)
+            # Standard pooling
+            if self.pooling_type == 'multi':
+                x_pooled = torch.cat([
+                    self.pool_mean(x_current, batch),
+                    self.pool_max(x_current, batch),
+                    self.pool_add(x_current, batch)
+                ], dim=1)
+            else:
+                x_pooled = self.pool(x_current, batch)
 
-        out_logits = self.mlp(x_pooled)
+        # Handle empty graphs
+        if x_pooled.size(0) == 0:
+            return torch.empty((0, self.mlp[-1].out_features), device=x.device)
+
+        # Classification with temperature scaling
+        raw_logits = self.mlp(x_pooled)
+        out_logits = raw_logits / self.temperature
         return out_logits
+    
+    def _apply_normalization(self, x, layer_idx):
+        """Apply normalization based on configuration"""
+        if x.size(0) == 0:
+            return x
+            
+        if self.use_batch_norm:
+            x = self.bn_gine[layer_idx](x)
+        if self.use_layer_norm:
+            x = self.ln_gine[layer_idx](x)
+        return x

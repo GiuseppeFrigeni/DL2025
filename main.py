@@ -7,7 +7,7 @@ from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import StructuralFeatures, NormalizeNodeFeatures
-from source.model import SimpleGCN, GINEGraphClassifier, GATv2GraphClassifier
+from source.model import SimpleGCN, GINEGraphClassifier, EnhancedGINEGraphClassifier
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -28,10 +28,6 @@ from torch.utils.data import Subset
 
 torch.backends.cuda.matmul.allow_tf32 = True  # Default False in PyTorch 1.12+
 torch.backends.cudnn.allow_tf32 = True  # Default True
-
-def add_zeros(data):
-    data.x = torch.zeros(data.num_nodes, dtype=torch.long)  
-    return data
 
 def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     """
@@ -392,7 +388,7 @@ def test_ensemble_softmax_avg(test_loader, model1, model2, device):
 def main(args):
     seed_everything(42)  # Set random seed for reproducibility
 
-    model_name = 'GATv2GraphClassifier' #'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
+    model_name = 'EnhancedGINEGraphClassifier' #'GINEGraphClassifier'    #"SimpleGCN"  # or "GINConv"
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
@@ -424,7 +420,7 @@ def main(args):
     my_transform = StructuralFeatures()
 
      # Number of GINE layers in the model
-    NUM_CLASSES = 6    # For your subset
+    NUM_CLASSES = 6    
     LEARNING_RATE = 5e-4
     EPOCHS = 200 
     WEIGHT_DECAY = 1e-4 # Add some regularization
@@ -433,7 +429,8 @@ def main(args):
     NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.5
+    DROPOUT_RATE_MLP = 0.5
+    DROPOUT_RATE_GINE = 0.3
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
     GAT_HEADS = 4 # Number of attention heads in GAT layers
@@ -443,35 +440,11 @@ def main(args):
     NUM_GRADUAL = 10 # Number of epochs for gradually increasing forget_rate (optional, from paper)
                  # e.g., start with forget_rate=0 and increase to target FORGET_RATE over NUM_GRADUAL epochs
     INITIAL_FORGET_RATE = 0.0 # If using gradual increase
-
-
-    if test_dir_name == "A":
-        print("Using configuration for test set A")
-        BATCH_SIZE = 32
-        NUM_GINE_LAYERS = 2
-        HIDDEN_DIM = 128
-        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
-
-    elif test_dir_name == "B":
-        print("Using configuration for test set B")
+    HIDDEN_DIM = 128 # Hidden dimension for GAT layers
+    BATCH_SIZE = 32
+    NUM_GINE_LAYERS = 2 # Number of GINE layers in the model
+    if test_dir_name == 'B':
         BATCH_SIZE = 8
-        NUM_GINE_LAYERS = 2
-        HIDDEN_DIM = 128
-        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
-
-    elif test_dir_name == "C":
-        print("Using configuration for test set C")
-        BATCH_SIZE = 32
-        NUM_GINE_LAYERS = 2
-        HIDDEN_DIM = 128
-        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
-
-    elif test_dir_name == "D":
-        print("Using configuration for test set D")
-        BATCH_SIZE = 32
-        NUM_GINE_LAYERS = 2
-        HIDDEN_DIM = 128
-        print(f"Batch size: {BATCH_SIZE}, GINE layers: {NUM_GINE_LAYERS}, Hidden dim: {HIDDEN_DIM}")
 
 
     test_dataset = GraphDataset(args.test_path, pre_transform=my_transform, force_reload=False)
@@ -545,39 +518,34 @@ def main(args):
         
 
         #model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
-        model1 =  GATv2GraphClassifier(
+        model1 =  EnhancedGINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM,
     edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
     hidden_channels=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
-    num_gat_layers=2,
-    gat_heads=GAT_HEADS, # Example: 8 heads for intermediate layers
-    gat_dropout=DROPOUT_RATE,
+    num_gine_layers=NUM_GINE_LAYERS,
+    dropout_gine=DROPOUT_RATE_GINE,
     output_heads=1, # Example: 1 head for the last layer, averaged
     concat_output_heads=False, # Average heads in the last layer
-    dropout_mlp=DROPOUT_RATE,
-    pooling_type='mean',
-    use_edge_attr_in_gat=True, # Try with and without
-    add_self_loops_gat=True,
+    dropout_mlp=DROPOUT_RATE_MLP,
+    pooling_type='attention',
+    train_eps=TRAIN_EPS, # Enable batch normalization in the model
     use_batch_norm=use_batch_norm
 ).to(device)
-        model2 = GATv2GraphClassifier(
+        model2 = EnhancedGINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM,
     edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
     hidden_channels=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
-    num_gat_layers=2,
-    gat_heads=GAT_HEADS, # Example: 8 heads for intermediate layers
-    gat_dropout=DROPOUT_RATE,
+    num_gine_layers=NUM_GINE_LAYERS,
+    dropout_gine=DROPOUT_RATE_GINE,
     output_heads=1, # Example: 1 head for the last layer, averaged
     concat_output_heads=False, # Average heads in the last layer
-    dropout_mlp=DROPOUT_RATE,
-    pooling_type='mean',
-    use_edge_attr_in_gat=True, # Try with and without
-    add_self_loops_gat=True,
+    dropout_mlp=DROPOUT_RATE_MLP,
+    pooling_type='attention',
+    train_eps=TRAIN_EPS, # Enable batch normalization in the model
     use_batch_norm=use_batch_norm
 ).to(device)
-
 
         
 
@@ -650,33 +618,39 @@ def main(args):
     best_epoch_1 = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_1)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{best_epoch_1}.pth"))
     print(f"Loading best model from epoch {best_epoch_1} for model1")
-    model1 = GINEGraphClassifier(
-            node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
-            edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
-            hidden_channels=HIDDEN_DIM,
-            out_channels=NUM_CLASSES,
-            dropout_gine=DROPOUT_RATE,
-            dropout_mlp=DROPOUT_RATE,
-            use_batch_norm=use_batch_norm,  # Enable batch normalization
-            num_gine_layers=NUM_GINE_LAYERS,
-            train_eps=TRAIN_EPS
-        ).to(device)       
+    model1 = EnhancedGINEGraphClassifier(
+            node_in_channels=NODE_FEATURE_DIM,
+    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
+    hidden_channels=HIDDEN_DIM,
+    out_channels=NUM_CLASSES,
+    num_gine_layers=NUM_GINE_LAYERS,
+    dropout_gine=DROPOUT_RATE_GINE,
+    output_heads=1, # Example: 1 head for the last layer, averaged
+    concat_output_heads=False, # Average heads in the last layer
+    dropout_mlp=DROPOUT_RATE_MLP,
+    pooling_type='attention',
+    train_eps=TRAIN_EPS, # Enable batch normalization in the model
+    use_batch_norm=use_batch_norm
+).to(device)
     model1.load_state_dict(best_model_state_dict)
 
     best_epoch_2 = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_2)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{best_epoch_2}.pth"))
     print(f"Loading best model from epoch {best_epoch_2} for model2")
-    model2 = GINEGraphClassifier(
-            node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
-            edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
-            hidden_channels=HIDDEN_DIM,
-            out_channels=NUM_CLASSES,
-            dropout_gine=DROPOUT_RATE,
-            dropout_mlp=DROPOUT_RATE,
-            use_batch_norm=use_batch_norm,  # Enable batch normalization
-            num_gine_layers=NUM_GINE_LAYERS,
-            train_eps=TRAIN_EPS
-        ).to(device)       
+    model2 = EnhancedGINEGraphClassifier(
+            node_in_channels=NODE_FEATURE_DIM,
+    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
+    hidden_channels=HIDDEN_DIM,
+    out_channels=NUM_CLASSES,
+    num_gine_layers=NUM_GINE_LAYERS,
+    dropout_gine=DROPOUT_RATE_GINE,
+    output_heads=1, # Example: 1 head for the last layer, averaged
+    concat_output_heads=False, # Average heads in the last layer
+    dropout_mlp=DROPOUT_RATE_MLP,
+    pooling_type='attention',
+    train_eps=TRAIN_EPS, # Enable batch normalization in the model
+    use_batch_norm=use_batch_norm
+).to(device)      
     model2.load_state_dict(best_model_state_dict)
 
 
