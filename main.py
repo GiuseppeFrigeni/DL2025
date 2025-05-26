@@ -377,16 +377,13 @@ def test_ensemble_softmax_avg(test_loader, model1, model2, device):
 
             logits1 = model1(data)
             logits2 = model2(data)
-            
-            print(logits1, logits2)
-            probs1 = F.softmax(logits1, dim=-1)
-            probs2 = F.softmax(logits2, dim=-1)
+        
 
-            print(probs1, probs2)
-            avg_probs = (probs1 + probs2) / 2.0
+            logits = (logits1 + logits2) / 2.0
+            pred = logits.argmax(dim=1)  # Ensure logits are in the right shape
+
             
-            print(avg_probs)
-            pred = torch.argmax(avg_probs, dim=-1)
+            print(logits,pred)
             predictions.extend(pred.cpu().numpy())  # Collect predictions
         
     return  predictions # Return predictions as numpy array
