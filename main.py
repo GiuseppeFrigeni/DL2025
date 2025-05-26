@@ -621,6 +621,7 @@ def main(args):
                 torch.save(model1.state_dict(), checkpoint_path) # Or save the better of the two
                 checkpoint_path = os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
                 torch.save(model2.state_dict(), checkpoint_path)
+                print(f"Saved new best model at epoch {epoch+1} with val acc {current_best_val_acc:.4f}")
             
             if (epoch + 1) % 10 == 0:
                 logging.info(f"Epoch {epoch+1}/{EPOCHS} - Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
@@ -633,6 +634,7 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_1)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
+    print(f"Loading best model from epoch {epoch_best_model} for model1")
     model1 = GINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
             edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
@@ -648,6 +650,7 @@ def main(args):
 
     epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_2)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
+    print(f"Loading best model from epoch {epoch_best_model} for model2")
     model2 = GINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
             edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
