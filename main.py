@@ -525,13 +525,11 @@ def main(args):
     out_channels=NUM_CLASSES,
     num_gine_layers=NUM_GINE_LAYERS,
     dropout_gine=DROPOUT_RATE_GINE,
-    output_heads=1, # Example: 1 head for the last layer, averaged
-    concat_output_heads=False, # Average heads in the last layer
     dropout_mlp=DROPOUT_RATE_MLP,
     pooling_type='attention',
     train_eps=TRAIN_EPS, # Enable batch normalization in the model
     use_batch_norm=use_batch_norm
-).to(device)
+    ).to(device)
         model2 = EnhancedGINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM,
     edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
@@ -539,13 +537,11 @@ def main(args):
     out_channels=NUM_CLASSES,
     num_gine_layers=NUM_GINE_LAYERS,
     dropout_gine=DROPOUT_RATE_GINE,
-    output_heads=1, # Example: 1 head for the last layer, averaged
-    concat_output_heads=False, # Average heads in the last layer
     dropout_mlp=DROPOUT_RATE_MLP,
     pooling_type='attention',
     train_eps=TRAIN_EPS, # Enable batch normalization in the model
     use_batch_norm=use_batch_norm
-).to(device)
+    ).to(device)
 
         
 
@@ -625,13 +621,12 @@ def main(args):
     out_channels=NUM_CLASSES,
     num_gine_layers=NUM_GINE_LAYERS,
     dropout_gine=DROPOUT_RATE_GINE,
-    output_heads=1, # Example: 1 head for the last layer, averaged
-    concat_output_heads=False, # Average heads in the last layer
     dropout_mlp=DROPOUT_RATE_MLP,
     pooling_type='attention',
     train_eps=TRAIN_EPS, # Enable batch normalization in the model
     use_batch_norm=use_batch_norm
-).to(device)
+    ).to(device)
+
     model1.load_state_dict(best_model_state_dict)
 
     best_epoch_2 = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_2)])
@@ -644,13 +639,11 @@ def main(args):
     out_channels=NUM_CLASSES,
     num_gine_layers=NUM_GINE_LAYERS,
     dropout_gine=DROPOUT_RATE_GINE,
-    output_heads=1, # Example: 1 head for the last layer, averaged
-    concat_output_heads=False, # Average heads in the last layer
     dropout_mlp=DROPOUT_RATE_MLP,
     pooling_type='attention',
     train_eps=TRAIN_EPS, # Enable batch normalization in the model
     use_batch_norm=use_batch_norm
-).to(device)      
+    ).to(device)      
     model2.load_state_dict(best_model_state_dict)
 
 
