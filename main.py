@@ -435,7 +435,7 @@ def main(args):
     TRAIN_EPS = True  # Enable batch normalization in the model
     GAT_HEADS = 4 # Number of attention heads in GAT layers
 
-    FORGET_RATE = 0.2 # Example: percentage of samples to potentially drop (1 - remember_rate)
+    FORGET_RATE = 0 # Example: percentage of samples to potentially drop (1 - remember_rate)
                   # Adjust this based on estimated noise rate. If noise is 40%, forget_rate could be 0.4.
     NUM_GRADUAL = 10 # Number of epochs for gradually increasing forget_rate (optional, from paper)
                  # e.g., start with forget_rate=0 and increase to target FORGET_RATE over NUM_GRADUAL epochs
