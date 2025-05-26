@@ -612,15 +612,17 @@ def main(args):
             # Save best model based on val_acc1 or val_acc2 (or average, or max)
             if val_acc1 > best_val_acc_1:
                 best_val_acc_1 = val_acc1
-                checkpoint_path = os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
+                best_epoch_1 = epoch + 1
+                checkpoint_path = os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{best_epoch_1}.pth")
                 torch.save(model1.state_dict(), checkpoint_path) # Or save the better of the two
-                print(f"Saved new best model_1 at epoch {epoch+1} with val acc {best_val_acc_1:.4f}")
+                print(f"Saved new best model_1 at epoch {best_epoch_1} with val acc {best_val_acc_1:.4f}")
             
             if val_acc2 > best_val_acc_2:
                 best_val_acc_2 = val_acc2
-                checkpoint_path = os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
+                best_epoch_2 = epoch + 1
+                checkpoint_path = os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{best_epoch_2}.pth")
                 torch.save(model2.state_dict(), checkpoint_path)
-                print(f"Saved new best model_2 at epoch {epoch+1} with val acc {best_val_acc_2:.4f}")
+                print(f"Saved new best model_2 at epoch {best_epoch_2} with val acc {best_val_acc_2:.4f}")
 
 
             if (epoch + 1) % 10 == 0:
@@ -632,9 +634,8 @@ def main(args):
 
 
 
-    epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_1)])
-    best_model_state_dict = torch.load(os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
-    print(f"Loading best model from epoch {epoch_best_model} for model1")
+    best_model_state_dict = torch.load(os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{best_epoch_1}.pth"))
+    print(f"Loading best model from epoch {best_epoch_1} for model1")
     model1 = GINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
             edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
@@ -648,9 +649,8 @@ def main(args):
         ).to(device)       
     model1.load_state_dict(best_model_state_dict)
 
-    epoch_best_model = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_2)])
-    best_model_state_dict = torch.load(os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{epoch_best_model}.pth"))
-    print(f"Loading best model from epoch {epoch_best_model} for model2")
+    best_model_state_dict = torch.load(os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{best_epoch_2}.pth"))
+    print(f"Loading best model from epoch {best_epoch_2} for model2")
     model2 = GINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
             edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
