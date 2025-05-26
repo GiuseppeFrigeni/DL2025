@@ -513,7 +513,7 @@ class NNConvNet(torch.nn.Module):
             edge_nni = torch.nn.Sequential(
             torch.nn.Linear(edge_feature_dim, hidden_channels),
             torch.nn.ReLU(),
-            torch.nn.Linear(hidden_channels, hidden_channels * node_in_channels)
+            torch.nn.Linear(hidden_channels, hidden_channels * current_dim)
             )
             self.convs.append(NNConv(current_dim, hidden_channels, nn=edge_nni, aggr='mean'))
             self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
