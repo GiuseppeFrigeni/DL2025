@@ -109,9 +109,9 @@ class GINEGraphClassifier(nn.Module):
             # This MLP processes the node features (x_i) and the aggregated messages
             # Its input dimension should be `current_dim` and output `hidden_channels`
             layer_nn = nn.Sequential(
-                nn.Linear(current_dim, hidden_channels * 2),
+                nn.Linear(current_dim, hidden_channels),
                 nn.ReLU(),
-                nn.Linear(hidden_channels * 2, hidden_channels),
+                nn.Linear(hidden_channels, hidden_channels),
             )
             
             self.gine_layers.append(
