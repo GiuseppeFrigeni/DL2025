@@ -27,6 +27,7 @@ from torch.utils.data import Subset
 
 
 
+
 def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     """
     Calculates min and max for a specific node feature dimension across the dataset.
@@ -323,7 +324,7 @@ def main(args):
     TRAIN_EPS = True  # Enable batch normalization in the model
 
     HIDDEN_DIM = 64 # Hidden dimension for GAT layers
-    BATCH_SIZE = 8
+    BATCH_SIZE = 16
     NUM_GINE_LAYERS = 2 # Number of GINE layers in the model
     if test_dir_name == 'B':
         BATCH_SIZE = 8
@@ -420,7 +421,6 @@ def main(args):
         train_losses = []
         train_accuracies = []
         vali_accuracies = []
-
 
         # Training loop
         for epoch in range(EPOCHS):
