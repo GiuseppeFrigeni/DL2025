@@ -426,7 +426,7 @@ def main(args):
      # Number of GINE layers in the model
     NUM_CLASSES = 6    # For your subset
     LEARNING_RATE = 5e-4
-    EPOCHS = 300 
+    EPOCHS = 200 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5   # Weight for Reverse Cross Entropy
