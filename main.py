@@ -7,7 +7,7 @@ from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import StructuralFeatures, NormalizeNodeFeatures
-from source.model import SimpleGCN, GINEGraphClassifier
+from source.model import SimpleGCN, GINEGraphClassifier, GATv2GraphClassifier
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -429,14 +429,15 @@ def main(args):
     EPOCHS = 300 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
-    BETA = 1.0   # Weight for Reverse Cross Entropy
+    BETA = 0.5   # Weight for Reverse Cross Entropy
     NODE_FEATURE_DIM = 3    # Since we have 1st and 2nd degree
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE = 0.5
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
-    FORGET_RATE = 0.1 # Example: percentage of samples to potentially drop (1 - remember_rate)
+
+    FORGET_RATE = 0.2 # Example: percentage of samples to potentially drop (1 - remember_rate)
                   # Adjust this based on estimated noise rate. If noise is 40%, forget_rate could be 0.4.
     NUM_GRADUAL = 10 # Number of epochs for gradually increasing forget_rate (optional, from paper)
                  # e.g., start with forget_rate=0 and increase to target FORGET_RATE over NUM_GRADUAL epochs
@@ -543,17 +544,22 @@ def main(args):
         
 
         #model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
-        model1 = GINEGraphClassifier(
-            node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
-            edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
-            hidden_channels=HIDDEN_DIM,
-            out_channels=NUM_CLASSES,
-            dropout_gine=DROPOUT_RATE,
-            dropout_mlp=DROPOUT_RATE,
-            use_batch_norm=use_batch_norm,  # Enable batch normalization
-            num_gine_layers=NUM_GINE_LAYERS,
-            train_eps=TRAIN_EPS
-        ).to(device)
+        model1 =  GATv2GraphClassifier(
+            node_in_channels=NODE_FEATURE_DIM,
+    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
+    hidden_channels=HIDDEN_DIM,
+    out_channels=NUM_CLASSES,
+    num_gat_layers=2,
+    gat_heads=8, # Example: 8 heads for intermediate layers
+    gat_dropout=DROPOUT_RATE,
+    output_heads=1, # Example: 1 head for the last layer, averaged
+    concat_output_heads=False, # Average heads in the last layer
+    dropout_mlp=DROPOUT_RATE,
+    pooling_type='mean',
+    use_edge_attr_in_gat=True, # Try with and without
+    add_self_loops_gat=True,
+    use_batch_norm=use_batch_norm
+)
         model2 = GINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM, # Pass 2 here
             edge_in_channels=EDGE_FEATURE_DIM, # Pass 7 here
