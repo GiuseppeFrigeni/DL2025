@@ -436,6 +436,7 @@ def main(args):
     DROPOUT_RATE = 0.5
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
+    GAT_HEADS = 4 # Number of attention heads in GAT layers
 
     FORGET_RATE = 0.2 # Example: percentage of samples to potentially drop (1 - remember_rate)
                   # Adjust this based on estimated noise rate. If noise is 40%, forget_rate could be 0.4.
@@ -550,7 +551,7 @@ def main(args):
     hidden_channels=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
     num_gat_layers=2,
-    gat_heads=8, # Example: 8 heads for intermediate layers
+    gat_heads=GAT_HEADS, # Example: 8 heads for intermediate layers
     gat_dropout=DROPOUT_RATE,
     output_heads=1, # Example: 1 head for the last layer, averaged
     concat_output_heads=False, # Average heads in the last layer
@@ -566,7 +567,7 @@ def main(args):
     hidden_channels=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
     num_gat_layers=2,
-    gat_heads=8, # Example: 8 heads for intermediate layers
+    gat_heads=GAT_HEADS, # Example: 8 heads for intermediate layers
     gat_dropout=DROPOUT_RATE,
     output_heads=1, # Example: 1 head for the last layer, averaged
     concat_output_heads=False, # Average heads in the last layer
