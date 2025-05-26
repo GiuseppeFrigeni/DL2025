@@ -278,111 +278,6 @@ def get_feature_statistics(dataset: Union[Dataset, List[Data]], batch_size: int 
     else:
         print("\nNo labels (data.y) found in the dataset.")
 
-def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, criterion_no_reduction, criterion, class_weights, epoch, num_epochs, device, forget_rate_schedule):
-    model1.train()
-    model2.train()
-
-    current_forget_rate = forget_rate_schedule[epoch] # Get forget rate for current epoch
-    #print(f"Epoch {epoch+1}/{num_epochs}, Current Forget Rate: {current_forget_rate:.4f}")
-
-    total_loss1 = 0
-    total_loss2 = 0
-    total_graphs = 0
-
-    for batch_idx, data in enumerate(train_loader):
-        data = data.to(device)
-        labels = data.y
-        if labels.ndim > 1: # Ensure labels are 1D
-            labels = labels.squeeze()
-        if labels.dtype != torch.long:
-            labels = labels.long()
-
-        # Forward pass for both models
-        logits1 = model1(data)
-        logits2 = model2(data)
-
-        # Calculate per-sample losses for selection
-        # Ensure your criterion can output per-sample losses (reduction='none')
-        loss_1_all_samples = criterion_no_reduction(logits1, labels)
-        loss_2_all_samples = criterion_no_reduction(logits2, labels)
-
-        num_remember = int((1 - current_forget_rate) * len(labels))
-        if num_remember == 0: # Avoid issues if forget_rate is 1 or batch is too small
-            num_remember = 1 
-        if num_remember > len(labels): # Should not happen if forget_rate <=1
-            num_remember = len(labels)
-
-
-        # Select small-loss samples for model1 to teach model2
-        _, sorted_indices_1 = torch.sort(loss_1_all_samples)
-        remember_indices_1 = sorted_indices_1[:num_remember]
-
-        # Select small-loss samples for model2 to teach model1
-        _, sorted_indices_2 = torch.sort(loss_2_all_samples)
-        remember_indices_2 = sorted_indices_2[:num_remember]
-        
-        # --- Co-teaching+ Disagreement (Optional, makes it Co-teaching+) ---
-        agree = (logits1.argmax(dim=1) == logits2.argmax(dim=1))
-        disagree_indices_1 = remember_indices_1[~agree[remember_indices_1]] # Model1's small loss where they disagree
-        disagree_indices_2 = remember_indices_2[~agree[remember_indices_2]] # Model2's small loss where they disagree
-        # If using Co-teaching+: use disagree_indices_1 for model2 update, disagree_indices_2 for model1 update
-        # If not using Co-teaching+: use remember_indices_1 for model2, remember_indices_2 for model1
-        # For simplicity, let's stick to standard Co-teaching here.
-        # ------------------------------------------------------------------
-
-        remember_indices_1 = disagree_indices_1
-        remember_indices_2 = disagree_indices_2
-
-        # Update model1 using samples selected by model2
-        if len(remember_indices_2) > 0:
-            logits1_selected = logits1[remember_indices_2]
-            labels_selected_for_1 = labels[remember_indices_2]
-            # Use your main SCE loss with reduction='mean' for the update
-            loss1_update = criterion(logits1_selected, labels_selected_for_1, class_weights=class_weights) # Or your SCE(reduction='mean')
-            
-            optimizer1.zero_grad()
-            loss1_update.backward()
-            optimizer1.step()
-            total_loss1 += loss1_update.item() * len(remember_indices_2)
-
-        # Update model2 using samples selected by model1
-        if len(remember_indices_1) > 0:
-            logits2_selected = logits2[remember_indices_1]
-            labels_selected_for_2 = labels[remember_indices_1]
-            # Use your main SCE loss with reduction='mean' for the update
-            loss2_update = criterion(logits2_selected, labels_selected_for_2, class_weights=class_weights) # Or your SCE(reduction='mean')
-
-            optimizer2.zero_grad()
-            loss2_update.backward()
-            optimizer2.step()
-            total_loss2 += loss2_update.item() * len(remember_indices_1)
-            
-        total_graphs += data.num_graphs # Or labels.size(0)
-
-    avg_loss1 = total_loss1 / total_graphs if total_graphs > 0 else 0
-    avg_loss2 = total_loss2 / total_graphs if total_graphs > 0 else 0
-    
-    # For accuracy, you'd typically evaluate one or both models on the training set (or validation)
-    # Here, just returning losses
-    return avg_loss1, avg_loss2
-
-def test_ensemble_softmax_avg(test_loader, model1, model2, device):
-    model1.eval()
-    model2.eval()
-    predictions = []
-    with torch.no_grad():
-        for data in test_loader:
-            data = data.to(device)
-
-            logits1 = model1(data)
-            logits2 = model2(data)
-        
-
-            logits = (logits1 + logits2) / 2.0
-            pred = logits.argmax(dim=1)  # Ensure logits are in the right shape
-            predictions.extend(pred.cpu().numpy())  # Collect predictions
-        
-    return  predictions # Return predictions as numpy array
 
 
 def main(args):
@@ -405,18 +300,15 @@ def main(args):
 
     # Define checkpoint path relative to the script's directory
     
-    checkpoints_folder_1 = os.path.join(os.getcwd(), "saved_models", test_dir_name, 'model1')
-    os.makedirs(checkpoints_folder_1, exist_ok=True)
-    checkpoints_folder_2 = os.path.join(os.getcwd(), "saved_models", test_dir_name, 'model2')
-    os.makedirs(checkpoints_folder_2, exist_ok=True)
-
+    checkpoints_folder = os.path.join(os.getcwd(), "saved_models", test_dir_name, 'model1')
+    os.makedirs(checkpoints_folder, exist_ok=True)
 
 
     submission_dir = os.path.join(os.getcwd(), 'submission')
     os.makedirs(submission_dir, exist_ok=True)
 
 
-    #transfrm
+    #transform
     my_transform = StructuralFeatures()
 
      # Number of GINE layers in the model
@@ -434,11 +326,6 @@ def main(args):
     use_batch_norm = True
     TRAIN_EPS = True  # Enable batch normalization in the model
 
-    FORGET_RATE = 0 # Example: percentage of samples to potentially drop (1 - remember_rate)
-                  # Adjust this based on estimated noise rate. If noise is 40%, forget_rate could be 0.4.
-    NUM_GRADUAL = 10 # Number of epochs for gradually increasing forget_rate (optional, from paper)
-                 # e.g., start with forget_rate=0 and increase to target FORGET_RATE over NUM_GRADUAL epochs
-    INITIAL_FORGET_RATE = 0.0 # If using gradual increase
     HIDDEN_DIM = 128 # Hidden dimension for GAT layers
     BATCH_SIZE = 32
     NUM_GINE_LAYERS = 2 # Number of GINE layers in the model
@@ -451,18 +338,11 @@ def main(args):
 
     if args.train_path:
 
-        
-
         # Remove previous checkpoints for the same test dataset
-        for filePath in os.listdir(checkpoints_folder_1):
+        for filePath in os.listdir(checkpoints_folder):
             if test_dir_name in filePath:
-                os.remove(os.path.join(checkpoints_folder_1,filePath))
+                os.remove(os.path.join(checkpoints_folder,filePath))
                 print(f"Removed previous checkpoint: {filePath}")
-        for filePath in os.listdir(checkpoints_folder_2):
-            if test_dir_name in filePath:
-                os.remove(os.path.join(checkpoints_folder_2,filePath))
-                print(f"Removed previous checkpoint: {filePath}")
-
 
         train_dataset = GraphDataset(args.train_path, pre_transform=my_transform, force_reload=False)
 
@@ -517,19 +397,7 @@ def main(args):
         
 
         #model = SimpleGCN(in_channels=IN_CHANNELS, hidden_channels=HIDDEN_CHANNELS, out_channels=NUM_CLASSES).to(device)
-        model1 =  EnhancedGINEGraphClassifier(
-            node_in_channels=NODE_FEATURE_DIM,
-    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
-    hidden_channels=HIDDEN_DIM,
-    out_channels=NUM_CLASSES,
-    num_gine_layers=NUM_GINE_LAYERS,
-    dropout_gine=DROPOUT_RATE_GINE,
-    dropout_mlp=DROPOUT_RATE_MLP,
-    pooling_type='attention',
-    train_eps=TRAIN_EPS, # Enable batch normalization in the model
-    use_batch_norm=use_batch_norm
-    ).to(device)
-        model2 = EnhancedGINEGraphClassifier(
+        model =  EnhancedGINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM,
     edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
     hidden_channels=HIDDEN_DIM,
@@ -545,75 +413,53 @@ def main(args):
         
 
         
-        optimizer1 = optim.Adam(model1.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-        optimizer2 = optim.Adam(model2.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        #optimizer2 = optim.Adam(model2.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
         #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=10, min_lr=1e-6)
         #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
-        criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='none')
-        criterion_val = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
+        criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
 
 
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
         vali_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
         
-        best_val_acc_1 = 0
-        best_val_acc_2 = 0
+        best_val_acc = 0
         train_losses = []
         train_accuracies = []
         vali_accuracies = []
 
-        forget_rate_schedule = np.ones(EPOCHS) * FORGET_RATE
-        if NUM_GRADUAL > 0 and EPOCHS > NUM_GRADUAL :
-            forget_rate_schedule[:NUM_GRADUAL] = np.linspace(INITIAL_FORGET_RATE, FORGET_RATE, NUM_GRADUAL)
-        else: # If no gradual period or NUM_EPOCHS too small for gradual
-            forget_rate_schedule = np.ones(EPOCHS) * FORGET_RATE
 
         # Training loop
         for epoch in range(EPOCHS):
-            avg_loss1, avg_loss2 = train_coteaching(train_loader, model1, model2, optimizer1, optimizer2,
-                    criterion, criterion_val, class_weights_tensor, epoch, EPOCHS, device, forget_rate_schedule)
-            print(f"Epoch {epoch+1}/{EPOCHS} - Model1 Avg Loss: {avg_loss1:.4f}, Model2 Avg Loss: {avg_loss2:.4f}")
+            train_loss = train(train_loader, model, optimizer, criterion, device, class_weights_tensor)
             
             # --- Validation ---
             # Evaluate model1 on val_loader
-            val_acc1, _ = evaluate(vali_loader, model1, device, calculate_accuracy=True) # criterion_val uses reduction='mean'
+            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True) # criterion uses reduction='mean'
+            val_acc, _ = evaluate(vali_loader, model, device, calculate_accuracy=True) # criterion_val uses reduction='mean'
             
-
-            # Evaluate model2 on val_loader
-            val_acc2, _ = evaluate(vali_loader, model2, device, calculate_accuracy=True)
-
-            print(f"Epoch {epoch+1}/{EPOCHS} - Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
-
+            print(f"Epoch {epoch+1}/{EPOCHS}, Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {val_acc:.4f}")
+            if (epoch + 1) % 10 == 0:
+                logging.info(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {val_acc:.4f}")
 
             # Save best model based on val_acc1 or val_acc2 (or average, or max)
-            if val_acc1 > best_val_acc_1:
-                best_val_acc_1 = val_acc1
-                best_epoch_1 = epoch + 1
-                checkpoint_path = os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{best_epoch_1}.pth")
-                torch.save(model1.state_dict(), checkpoint_path) # Or save the better of the two
-                print(f"+++++ Saved new best model_1 at epoch {best_epoch_1} with val acc {best_val_acc_1:.4f}")
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                best_epoch = epoch + 1
+                checkpoint_path = os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{best_epoch}.pth")
+                torch.save(model.state_dict(), checkpoint_path) # Or save the better of the two
+                print(f"+++++ Saved new best model at epoch {best_epoch} with val acc {best_val_acc:.4f}")
             
-            if val_acc2 > best_val_acc_2:
-                best_val_acc_2 = val_acc2
-                best_epoch_2 = epoch + 1
-                checkpoint_path = os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{best_epoch_2}.pth")
-                torch.save(model2.state_dict(), checkpoint_path)
-                print(f"+++++ Saved new best model_2 at epoch {best_epoch_2} with val acc {best_val_acc_2:.4f}")
-
-
-            if (epoch + 1) % 10 == 0:
-                logging.info(f"Epoch {epoch+1}/{EPOCHS} - Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
-
             #scheduler.step(vali_acc)  # Step scheduler based on validation accuracy
             
 
 
     
-    best_epoch_1 = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_1)])
-    best_model_state_dict = torch.load(os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{best_epoch_1}.pth"))
-    print(f"Loading best model from epoch {best_epoch_1} for model1")
-    model1 = EnhancedGINEGraphClassifier(
+    best_epoch = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder)])
+    best_model_state_dict = torch.load(os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{best_epoch}.pth"))
+    print(f"Loading best model from epoch {best_epoch} for model")
+    model = EnhancedGINEGraphClassifier(
             node_in_channels=NODE_FEATURE_DIM,
     edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
     hidden_channels=HIDDEN_DIM,
@@ -626,26 +472,7 @@ def main(args):
     use_batch_norm=use_batch_norm
     ).to(device)
 
-    model1.load_state_dict(best_model_state_dict)
-
-    best_epoch_2 = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_2)])
-    best_model_state_dict = torch.load(os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{best_epoch_2}.pth"))
-    print(f"Loading best model from epoch {best_epoch_2} for model2")
-    model2 = EnhancedGINEGraphClassifier(
-            node_in_channels=NODE_FEATURE_DIM,
-    edge_in_channels=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
-    hidden_channels=HIDDEN_DIM,
-    out_channels=NUM_CLASSES,
-    num_gine_layers=NUM_GINE_LAYERS,
-    dropout_gine=DROPOUT_RATE_GINE,
-    dropout_mlp=DROPOUT_RATE_MLP,
-    pooling_type='attention',
-    train_eps=TRAIN_EPS, # Enable batch normalization in the model
-    use_batch_norm=use_batch_norm
-    ).to(device)      
-    model2.load_state_dict(best_model_state_dict)
-
-
+    model.load_state_dict(best_model_state_dict)
 
      # Prepare test dataset and loader
     
@@ -653,8 +480,7 @@ def main(args):
 
     # Evaluate and save test predictions
 
-    
-    predictions = test_ensemble_softmax_avg(test_loader, model1, model2, device)
+    predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
     print(f"Test predictions: {predictions}")
     test_graph_ids = list(range(len(predictions)))
 
