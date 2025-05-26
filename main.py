@@ -404,7 +404,7 @@ def main(args):
     dropout_gine=DROPOUT_RATE_GINE,
     dropout_mlp=DROPOUT_RATE_MLP,
     pooling_type='attention',
-    train_eps=TRAIN_EPS, # Enable batch normalization in the model
+    train_eps=TRAIN_EPS, 
     use_batch_norm=use_batch_norm
     ).to(device)
 
