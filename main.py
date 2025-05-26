@@ -669,6 +669,7 @@ def main(args):
 
     
     predictions = test_ensemble_softmax_avg(test_loader, model1, model2, device)
+    print(f"Test predictions: {predictions}")
     test_graph_ids = list(range(len(predictions)))
 
     # Save predictions to CSV
