@@ -370,11 +370,10 @@ def train_coteaching(train_loader, model1, model2, optimizer1, optimizer2, crite
 def test_ensemble_softmax_avg(test_loader, model1, model2, device):
     model1.eval()
     model2.eval()
-    correct = 0
-    total = 0
     with torch.no_grad():
         for data in test_loader:
             data = data.to(device)
+            labels = data.y
             
             if labels.ndim > 1: labels = labels.squeeze()
             if labels.dtype != torch.long: labels = labels.long()
