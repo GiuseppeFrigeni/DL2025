@@ -651,7 +651,7 @@ def main(args):
         ).to(device)       
     model1.load_state_dict(best_model_state_dict)
 
-    best_epoch_2 = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_1)])
+    best_epoch_2 = max([int(checkpoint.split('_')[-1].split('.')[0]) for checkpoint in os.listdir(checkpoints_folder_2)])
     best_model_state_dict = torch.load(os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{best_epoch_2}.pth"))
     print(f"Loading best model from epoch {best_epoch_2} for model2")
     model2 = GINEGraphClassifier(
