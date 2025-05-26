@@ -382,8 +382,6 @@ def test_ensemble_softmax_avg(test_loader, model1, model2, device):
             logits = (logits1 + logits2) / 2.0
             pred = logits.argmax(dim=1)  # Ensure logits are in the right shape
 
-            
-            print(logits,pred)
             predictions.extend(pred.cpu().numpy())  # Collect predictions
         
     return  predictions # Return predictions as numpy array
@@ -609,17 +607,22 @@ def main(args):
 
             print(f"Epoch {epoch+1}/{EPOCHS} - Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
 
-            best_overall_val_acc = 0
+            best_val_acc_1 = 0
+            best_val_acc_2 = 0
             # Save best model based on val_acc1 or val_acc2 (or average, or max)
-            current_best_val_acc = (val_acc1 + val_acc2)/2 # Example
-            if current_best_val_acc > best_overall_val_acc:
-                best_overall_val_acc = current_best_val_acc
+            if val_acc1 > best_val_acc_1:
+                best_val_acc_1 = val_acc1
                 checkpoint_path = os.path.join(checkpoints_folder_1, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
                 torch.save(model1.state_dict(), checkpoint_path) # Or save the better of the two
+                print(f"Saved new best model_1 at epoch {epoch+1} with val acc {best_val_acc_1:.4f}")
+            
+            if val_acc2 > best_val_acc_2:
+                best_val_acc_2 = val_acc2
                 checkpoint_path = os.path.join(checkpoints_folder_2, f"model_{test_dir_name}_epoch_{epoch+1}.pth")
                 torch.save(model2.state_dict(), checkpoint_path)
-                print(f"Saved new best model at epoch {epoch+1} with val acc {current_best_val_acc:.4f}")
-            
+                print(f"Saved new best model_2 at epoch {epoch+1} with val acc {best_val_acc_2:.4f}")
+
+
             if (epoch + 1) % 10 == 0:
                 logging.info(f"Epoch {epoch+1}/{EPOCHS} - Model1 Val Acc: {val_acc1:.4f}, Model2 Val Acc: {val_acc2:.4f}")
 
