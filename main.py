@@ -325,7 +325,7 @@ def main(args):
 
     HIDDEN_DIM = 16 # Hidden dimension for GAT layers
     BATCH_SIZE = 32
-    NUM_GINE_LAYERS = 2 # Number of GINE layers in the model
+    NUM_GINE_LAYERS = 3 # Number of GINE layers in the model
     if test_dir_name == 'B':
         BATCH_SIZE = 8
 
