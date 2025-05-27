@@ -324,11 +324,15 @@ def main(args):
     TRAIN_EPS = True  # Enable batch normalization in the model
 
     HIDDEN_DIM = 1024 # Hidden dimension for GAT layers
-    HIDDEN_CHANNELS = 64 # Hidden dimension for GINE layers
+    HIDDEN_CHANNELS = 32 # Hidden dimension for GINE layers
     BATCH_SIZE = 32
     NUM_GINE_LAYERS = 2 # Number of GINE layers in the model
+    if test_dir_name == 'A':
+        HIDDEN_CHANNELS = 64
+
     if test_dir_name == 'B':
         BATCH_SIZE = 8
+        HIDDEN_CHANNELS = 64
 
 
     test_dataset = GraphDataset(args.test_path, pre_transform=my_transform, force_reload=False)
