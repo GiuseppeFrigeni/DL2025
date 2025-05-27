@@ -122,8 +122,7 @@ def main(args):
         HIDDEN_CHANNELS = 64
 
     if test_dir_name == 'B':
-        BATCH_SIZE = 8
-        HIDDEN_CHANNELS = 64
+        BATCH_SIZE = 16
 
 
     test_dataset = GraphDataset(args.test_path, pre_transform=my_transform, force_reload=False)
