@@ -82,7 +82,7 @@ def main(args):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
-
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     test_dir_name = os.path.basename(os.path.dirname(args.test_path))
 
     # Define log file path relative to the script's directory
@@ -93,7 +93,7 @@ def main(args):
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
     # Define checkpoint path relative to the script's directory
-    checkpoints_folder = os.path.join(os.getcwd(), "saved_models", test_dir_name, 'model1')
+    checkpoints_folder = os.path.join(script_dir, "saved_models", test_dir_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
     submission_dir = os.path.join(os.getcwd(), 'submission')
