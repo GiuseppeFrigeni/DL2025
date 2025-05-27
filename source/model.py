@@ -501,9 +501,9 @@ class NNConvNet(torch.nn.Module):
         # Output dim: hidden_channels * hidden_channels for subsequent layers
         
         edge_nn1 = torch.nn.Sequential(
-            torch.nn.Linear(edge_feature_dim, hidden_channels),
+            torch.nn.Linear(edge_feature_dim, hidden_channels * hidden_channels),
             torch.nn.ReLU(),
-            torch.nn.Linear(hidden_channels, hidden_channels * node_in_channels) # Or some other size
+            torch.nn.Linear(hidden_channels * hidden_channels, hidden_channels * node_in_channels) # Or some other size
         )
         self.convs.append(NNConv(node_in_channels, hidden_channels, nn=edge_nn1, aggr='mean')) # or 'add', 'max'
         self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
@@ -511,9 +511,9 @@ class NNConvNet(torch.nn.Module):
         current_dim = hidden_channels
         for _ in range(num_layers - 1):
             edge_nni = torch.nn.Sequential(
-            torch.nn.Linear(edge_feature_dim, hidden_channels),
+            torch.nn.Linear(edge_feature_dim, hidden_channels * hidden_channels),
             torch.nn.ReLU(),
-            torch.nn.Linear(hidden_channels, hidden_channels * current_dim)
+            torch.nn.Linear(hidden_channels * hidden_channels, hidden_channels * current_dim)
             )
             self.convs.append(NNConv(current_dim, hidden_channels, nn=edge_nni, aggr='mean'))
             self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
