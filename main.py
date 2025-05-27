@@ -113,11 +113,12 @@ def main(args):
     EDGE_FEATURE_DIM = 7
     DROPOUT_RATE = 0.5
     #use_batch_norm = True
-
     HIDDEN_DIM = 1024 # Hidden dimension for GAT layers
     HIDDEN_CHANNELS = 32 # Hidden dimension for GINE layers
     BATCH_SIZE = 32
     NUM_LAYERS = 2 # Number of GINE layers in the model
+
+    
     if test_dir_name == 'A':
         HIDDEN_CHANNELS = 64
 
