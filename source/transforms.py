@@ -18,18 +18,14 @@ class StructuralFeatures(BaseTransform):
                     temp_data_for_nx.edge_index = edge_index_no_loops
                 nx_graph = to_networkx(temp_data_for_nx, to_undirected=False)
                 if nx_graph.is_directed():
-                        # This conversion sums weights for parallel edges if any, but ogbg-ppa edges are usually unique
-                        # or attributes are handled separately. For pure structure, this is fine.
                     undirected_nx_graph = nx_graph.to_undirected()
                 else:
                     undirected_nx_graph = nx_graph
                 try:
                     clustering_coeffs_dict = nx.clustering(undirected_nx_graph)
-                    # Convert dict to a tensor in the correct node order
                     cc_list = [clustering_coeffs_dict.get(i, 0.0) for i in range(data.num_nodes)]
                     cc_tensor = torch.tensor(cc_list, dtype=torch.float)
                 except Exception as e:
-                    # Fallback in case of any NetworkX error (e.g., unexpected graph structure)
                     print(f"Warning: Could not compute clustering coefficient for a graph: {e}. Using zeros.")
                     cc_tensor = torch.zeros(data.num_nodes, dtype=torch.float)
 
@@ -72,12 +68,6 @@ class NormalizeNodeFeatures(BaseTransform):
                     else: # If max == min, set to 0 or 0.5, or handle as needed
                         x_normalized[:, dim_idx] = 0.0
                     
-                    # For Standardization:
-                    # mean_val, std_val = params
-                    # if std_val > 1e-6: # Avoid division by zero
-                    #     x_normalized[:, dim_idx] = (x_normalized[:, dim_idx] - mean_val) / std_val
-                    # else:
-                    #     x_normalized[:, dim_idx] = 0.0 # Or just (x - mean_val)
 
             data.x = x_normalized
         return data
