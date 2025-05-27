@@ -398,7 +398,8 @@ def main(args):
         model =  NNConvNet(
             node_in_channels=NODE_FEATURE_DIM,
     edge_feature_dim=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
-    hidden_channels=HIDDEN_DIM,
+    hidden_channels=HIDDEN_CHANNELS,
+    hidden_dim=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
     num_layers=NUM_GINE_LAYERS,
     dropout=DROPOUT_RATE_GINE,
@@ -455,7 +456,8 @@ def main(args):
     model =  NNConvNet(
             node_in_channels=NODE_FEATURE_DIM,
     edge_feature_dim=EDGE_FEATURE_DIM, # Set to 0 if use_edge_attr_in_gat is False
-    hidden_channels=HIDDEN_DIM,
+    hidden_channels=HIDDEN_CHANNELS,
+    hidden_dim=HIDDEN_DIM,
     out_channels=NUM_CLASSES,
     num_layers=NUM_GINE_LAYERS,
     dropout=DROPOUT_RATE_GINE,
