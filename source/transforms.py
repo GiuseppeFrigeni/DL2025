@@ -82,7 +82,6 @@ class CombinedPreTransform(BaseTransform):
         self.expected_total_features = self.num_structural_features + self.k_lap_pe
 
         if self.k_lap_pe > 0:
-            # cat=True: concatenates PE to data.x.
             # attr_name='lap_pe': PEs are temporarily stored in data.lap_pe then concatenated to data.x.
             # If data.x doesn't exist, it will create data.x from PE.
             # It handles padding if num_nodes < k_lap_pe.
