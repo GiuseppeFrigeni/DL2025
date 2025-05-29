@@ -236,8 +236,8 @@ def main(args):
     os.makedirs(submission_dir, exist_ok=True)
 
     NUM_CLASSES = 6    
-    LEARNING_RATE = 5e-4
-    EPOCHS = 200 
+    LEARNING_RATE = 1e-3
+    EPOCHS = 500 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5  # Weight for Reverse Cross Entropy
@@ -253,7 +253,7 @@ def main(args):
     BATCH_SIZE = 32
     NUM_LAYERS = 2 # Number of GINE layers in the model
 
-    LEARNING_RATE_U = 0.1 
+    LEARNING_RATE_U = 1 
     INITIAL_U_STD = 1e-9
     GCOD_EMBEDDING_DIM = HIDDEN_CHANNELS
 
