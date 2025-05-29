@@ -30,42 +30,38 @@ def train_gcod(data_loader, model, criterion_gcod, optimizer_model, optimizer_u,
     total_loss_model_epoch = 0
     total_loss_u_epoch = 0
     
-    for batch_idx, (data_batch, batch_original_indices) in enumerate(data_loader): # Assuming DataLoader yields (data, original_indices)
+    for batch_idx, (data_batch, batch_original_indices) in enumerate(data_loader): 
         data_batch = data_batch.to(device)
-        # If train_dataset_indices_map is provided, map batch_original_indices to u_all_samples indices
-        if train_dataset_indices_map is not None:
-            u_indices_for_batch = train_dataset_indices_map[batch_original_indices.long()]
-        else: # Assume batch_original_indices are direct indices for u_all_samples
-            u_indices_for_batch = batch_original_indices
-
+        u_indices_for_batch = batch_original_indices # Assuming direct mapping
 
         optimizer_model.zero_grad()
         optimizer_u.zero_grad()
 
-        logits, embeddings_batch_Z_B = model(data_batch) # Model must return embeddings
+        logits, embeddings_batch_Z_B = model(data_batch) 
         u_for_batch = criterion_gcod.get_u_for_batch(u_indices_for_batch)
 
         loss_model_batch, loss_u_batch = criterion_gcod(logits, embeddings_batch_Z_B, data_batch.y.squeeze(), u_for_batch, current_epoch_train_acc)
 
-        if torch.isnan(loss_model_batch) or torch.isinf(loss_model_batch):
-            print(f"Warning: Model loss is NaN/Inf in batch {batch_idx}. Skipping batch.")
-            # Potentially log more details about logits, embeddings, u_for_batch
+        if torch.isnan(loss_model_batch) or torch.isinf(loss_model_batch) or \
+           torch.isnan(loss_u_batch) or torch.isinf(loss_u_batch):
+            print(f"Warning: NaN/Inf loss in batch {batch_idx}. ModelLoss: {loss_model_batch}, ULoss: {loss_u_batch}. Skipping batch update.")
             continue
-        if torch.isnan(loss_u_batch) or torch.isinf(loss_u_batch):
-            print(f"Warning: U loss is NaN/Inf in batch {batch_idx}. Skipping u_step for this batch.")
-        else:
-             loss_u_batch.backward() # Backward for U loss
-             optimizer_u.step()
-             with torch.no_grad(): # Clamp U after step
-                 criterion_gcod.u_all_samples.clamp_(0.0, 1.0)
+        
+        # First backward pass (for u)
+        # Since loss_model_batch also depends on logits/embeddings, we need to retain the graph here.
+        loss_u_batch.backward(retain_graph=True) 
+        optimizer_u.step()
+        with torch.no_grad(): 
+            criterion_gcod.u_all_samples.clamp_(0.0, 1.0)
 
-
-        loss_model_batch.backward() # Backward for Model loss (retain_graph=True was removed as L_u backwarded first)
+        # Second backward pass (for model parameters)
+        # Now this can proceed because retain_graph=True was set on the previous backward call
+        # for the shared parts of the graph.
+        loss_model_batch.backward() 
         optimizer_model.step()
         
-        total_loss_model_epoch += loss_model_batch.item() * data_batch.num_graphs # data_batch.num_graphs for PyG
-        if not (torch.isnan(loss_u_batch) or torch.isinf(loss_u_batch)):
-            total_loss_u_epoch += loss_u_batch.item() * data_batch.num_graphs
+        total_loss_model_epoch += loss_model_batch.item() * data_batch.num_graphs
+        total_loss_u_epoch += loss_u_batch.item() * data_batch.num_graphs
 
     avg_loss_model = total_loss_model_epoch / len(data_loader.dataset) if len(data_loader.dataset) > 0 else 0
     avg_loss_u = total_loss_u_epoch / len(data_loader.dataset) if len(data_loader.dataset) > 0 else 0
