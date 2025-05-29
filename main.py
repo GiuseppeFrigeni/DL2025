@@ -135,7 +135,6 @@ class GCODLoss(nn.Module):
         u_batch_clamped = torch.clamp(u_batch, 1e-7, 1.0 - 1e-7)
         target_kl_L3_scalar = torch.sigmoid(-torch.log(u_batch_clamped))
         
-        # Clamp target_kl_L3_scalar as well to avoid issues with log((1-target)/(1-prob)) if target is exactly 1
         target_kl_L3_scalar_clamped = torch.clamp(target_kl_L3_scalar, 1e-7, 1.0 - 1e-7)
 
         kl_term_1 = target_kl_L3_scalar_clamped * torch.log(target_kl_L3_scalar_clamped / model_prob_true_class_clamped + 1e-7) # Added epsilon for log
@@ -144,7 +143,6 @@ class GCODLoss(nn.Module):
         L3_per_sample = (1.0 - training_accuracy_epoch) * (kl_term_1 + kl_term_2)
         L3 = L3_per_sample.mean()
         if torch.isnan(L3) or torch.isinf(L3):
-            # print(f"Warning: L3 is NaN or Inf. L3_per_sample: {L3_per_sample}, training_acc: {training_accuracy_epoch}, target_kl: {target_kl_L3_scalar_clamped}, model_prob: {model_prob_true_class_clamped}")
             L3 = torch.tensor(0.0, device=self.device) # Ensure L3 is differentiable even if 0
 
         loss_model = L1 + L3
@@ -406,7 +404,30 @@ def main(args):
             log_msg_epoch += f", U Loss: {train_loss_u:.4f}"
             log_msg_epoch += f", Train Acc: {current_epoch_train_acc:.4f}, Val Acc: {val_acc:.4f}"
             print(log_msg_epoch)
-            if (epoch_num + 1) % 10 == 0: logging.info(log_msg_epoch)
+            if (epoch_num + 1) % 10 == 0: 
+                logging.info(log_msg_epoch)
+                with torch.no_grad(): # Ensure no gradients are computed for this
+                    u_values = criterion_gcod.u_all_samples.cpu().numpy() # Move to CPU and convert to numpy
+                    
+                    u_min = np.min(u_values)
+                    u_max = np.max(u_values)
+                    u_mean = np.mean(u_values)
+                    u_median = np.median(u_values)
+                    u_std = np.std(u_values)
+                    
+                    # Count samples with u > threshold (e.g., 0.5)
+                    threshold = 0.5
+                    num_u_above_threshold = np.sum(u_values > threshold)
+                    percent_u_above_threshold = (num_u_above_threshold / len(u_values)) * 100
+                    
+                    u_stats_msg = (
+                        f"  U Stats (Epoch {epoch_num+1}): "
+                        f"Min={u_min:.4f}, Max={u_max:.4f}, Mean={u_mean:.4f}, Median={u_median:.4f}, Std={u_std:.4f}, "
+                        f"Num > {threshold}={num_u_above_threshold} ({percent_u_above_threshold:.2f}%)"
+                    )
+                    print(u_stats_msg)
+
+
         
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
