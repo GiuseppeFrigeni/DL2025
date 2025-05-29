@@ -127,7 +127,7 @@ def main(args):
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
     # Define checkpoint path relative to the script's directory
-    checkpoints_folder = os.path.join(script_dir, "checkpoint", test_dir_name)
+    checkpoints_folder = os.path.join(script_dir, "checkpoints", test_dir_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
     submission_dir = os.path.join(os.getcwd(), 'submission')
