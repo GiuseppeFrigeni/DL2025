@@ -87,7 +87,7 @@ class CombinedPreTransform(BaseTransform):
             # If data.x doesn't exist, it will create data.x from PE.
             # It handles padding if num_nodes < k_lap_pe.
             self.lap_pe_transform = AddLaplacianEigenvectorPE(
-                k=k_lap_pe, attr_name='lap_pe', cat=True, is_undirected=True
+                k=k_lap_pe, attr_name='lap_pe', is_undirected=True
             )
         else:
             self.lap_pe_transform = None
