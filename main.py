@@ -271,8 +271,6 @@ def main(args):
     #transform
     my_transform = CombinedPreTransform(k_lap_pe=K_LAP_PE, num_structural_features=NUM_STRUCTURAL_FEATURES)
 
-    if test_dir_name == 'B':
-        BATCH_SIZE = 16
 
 
     if args.train_path:
