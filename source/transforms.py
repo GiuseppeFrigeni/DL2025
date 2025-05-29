@@ -105,6 +105,7 @@ class CombinedPreTransform(BaseTransform):
 
                 # LapPE transform will append k_lap_pe features to data.x
                 data = self.lap_pe_transform(data)
+                data.x = torch.cat((data.x, data.lap_pe), dim=1)
             else: # No nodes, ensure data.x is (0, total_features)
                 data.x = torch.empty((0, self.expected_total_features), dtype=torch.float)
         
