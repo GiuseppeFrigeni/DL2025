@@ -189,23 +189,16 @@ def train(data_loader, model, optimizer, criterion, device, class_weights=None):
 
 
 def evaluate(data_loader, model, device, calculate_accuracy=False):
-    # ... (function body as provided - ensure it unpacks (output, _) from model)
     model.eval()
     correct = 0
     total = 0
-    predictions_list = [] # Renamed to avoid conflict
+    predictions_list = [] 
     with torch.no_grad():
-        for data_item in data_loader: # data_loader now yields (data_batch, indices) or just data_batch
-            if isinstance(data_item, tuple): 
-                data_batch, _ = data_item # If using IndexedDataset for validation/test loader
-            else:
-                data_batch = data_item
+        for data_batch in data_loader: # DataLoader now yields PyG Data/Batch objects directly
+            # No need to check for tuple if using the _for_eval loaders
+            data_batch = data_batch.to(device) # This should now work
             
-            data_batch = data_batch.to(device)
-            
-            # Model returns (logits, embeddings) even in eval if return_embeddings=True
-            # We only need logits for evaluation.
-            output, _ = model(data_batch) # Unpack tuple
+            output, _ = model(data_batch) # Assuming model returns (logits, embeddings)
             pred = output.argmax(dim=1)
             predictions_list.extend(pred.cpu().numpy())
             if calculate_accuracy:
@@ -331,13 +324,14 @@ def main(args):
                                       initial_u_std=INITIAL_U_STD)
         optimizer_u = optim.SGD([criterion_gcod.u_all_samples], lr=LEARNING_RATE_U)
 
-        # --- DataLoaders with IndexedDataset for training ---
+        # For GCOD training (needs indices)
         indexed_train_dataset = IndexedDataset(train_dataset)
-        train_loader = DataLoader(indexed_train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True if len(indexed_train_dataset) % BATCH_SIZE ==1 else False) # drop_last if last batch is size 1 and causes issues
-        
-        # For validation, IndexedDataset is optional but evaluate function adapted for it
-        indexed_validation_dataset = IndexedDataset(validation_dataset)
-        vali_loader = DataLoader(indexed_validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
+        train_loader_for_gcod = DataLoader(indexed_train_dataset, batch_size=BATCH_SIZE, shuffle=True) 
+
+        # For evaluation (does not need indices from IndexedDataset directly in evaluate)
+        # Pass the original PyG datasets to these loaders
+        train_loader_for_eval = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False) # Use train_dataset
+        vali_loader_for_eval = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False) # Use validation_dataset
 
         best_val_acc = 0
         best_epoch_val = 0
@@ -377,14 +371,14 @@ def main(args):
             model.train()
 
             train_loss_model, train_loss_u = train_gcod(
-                    train_loader, model, criterion_gcod, 
+                    train_loader_for_gcod, model, criterion_gcod, 
                     optimizer, optimizer_u, device, 
                     current_epoch_train_acc
                 )
             train_loss_display = train_loss_model
             
-            current_epoch_train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True) # Uses updated model
-            val_acc, _ = evaluate(vali_loader, model, device, calculate_accuracy=True)
+            current_epoch_train_acc, _ = evaluate(train_loader_for_eval, model, device, calculate_accuracy=True) # Uses updated model
+            val_acc, _ = evaluate(vali_loader_for_eval, model, device, calculate_accuracy=True)
             
             log_msg_epoch = f"Epoch {epoch_num+1}/{EPOCHS}, Train Loss: {train_loss_display:.4f}"
             log_msg_epoch += f", U Loss: {train_loss_u:.4f}"
