@@ -6,7 +6,7 @@ from source.loadData import GraphDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import StructuralFeatures, NormalizeNodeFeatures, CombinedPreTransform
-from source.model import  NNConvNet
+from source.model import  NNConvNet, GINENetForGCOD
 from source.loss import SCELoss
 import pandas as pd
 from torch_geometric.data import Dataset # Or your specific dataset class
@@ -257,6 +257,16 @@ def main(args):
     INITIAL_U_STD = 1e-9
     GCOD_EMBEDDING_DIM = HIDDEN_CHANNELS
 
+    GNN_TYPE = 'GINE' # Switch to GINE
+    EDGE_FEATURE_DIM = 7 # Your edge feature dimension
+    GIN_HIDDEN_CHANNELS = 300 # Or your desired hidden size for GINE
+    GIN_NUM_LAYERS = 5
+    GIN_MLP_HIDDEN_CHANNELS = 128
+    GCOD_EMBEDDING_DIM = GIN_HIDDEN_CHANNELS
+    # GINE specific params (optional, defaults are often fine)
+    GINE_EPS = 0.0
+    GINE_TRAIN_EPS = False
+
     
     #transform
     my_transform = CombinedPreTransform(k_lap_pe=K_LAP_PE, num_structural_features=NUM_STRUCTURAL_FEATURES)
@@ -297,8 +307,22 @@ def main(args):
         num_samples_for_gcod_u = len(train_dataset)
 
 
-
-        model = NNConvNet(
+        if GNN_TYPE == 'GINE':
+            model = GINENetForGCOD(
+        node_in_channels=NODE_FEATURE_DIM,
+        edge_feature_dim=EDGE_FEATURE_DIM, # Pass edge feature dim
+        gnn_hidden_channels=GIN_HIDDEN_CHANNELS,
+        num_gnn_layers=GIN_NUM_LAYERS,
+        mlp_hidden_channels=GIN_MLP_HIDDEN_CHANNELS,
+        out_channels_final=NUM_CLASSES,
+        dropout_rate=DROPOUT_RATE,
+        return_embeddings=True,
+        pooling_type='mean',
+        eps=GINE_EPS,
+        train_eps=GINE_TRAIN_EPS
+    ).to(device)
+        else:
+            model = NNConvNet(
             node_in_channels=NODE_FEATURE_DIM, # Or node_feature_dim_from_model when loading
             edge_feature_dim=EDGE_FEATURE_DIM,
             out_channels_gnn=GCOD_EMBEDDING_DIM,      # GNN output dim
