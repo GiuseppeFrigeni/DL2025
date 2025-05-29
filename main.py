@@ -10,13 +10,150 @@ from source.model import  NNConvNet
 from source.loss import SCELoss
 import pandas as pd
 from torch_geometric.data import Dataset # Or your specific dataset class
-
+import torch.nn as nn
+import torch.nn.functional as F
 from torch import optim
 from sklearn.model_selection import train_test_split
 
 import numpy as np
 
+class IndexedDataset(torch.utils.data.Dataset):
+    def __init__(self, original_dataset):
+        self.original_dataset = original_dataset
+    def __len__(self):
+        return len(self.original_dataset)
+    def __getitem__(self, idx):
+        return self.original_dataset[idx], idx
 
+def train_gcod(data_loader, model, criterion_gcod, optimizer_model, optimizer_u, device, current_epoch_train_acc, train_dataset_indices_map=None):
+    model.train()
+    total_loss_model_epoch = 0
+    total_loss_u_epoch = 0
+    
+    for batch_idx, (data_batch, batch_original_indices) in enumerate(data_loader): # Assuming DataLoader yields (data, original_indices)
+        data_batch = data_batch.to(device)
+        # If train_dataset_indices_map is provided, map batch_original_indices to u_all_samples indices
+        if train_dataset_indices_map is not None:
+            u_indices_for_batch = train_dataset_indices_map[batch_original_indices.long()]
+        else: # Assume batch_original_indices are direct indices for u_all_samples
+            u_indices_for_batch = batch_original_indices
+
+
+        optimizer_model.zero_grad()
+        optimizer_u.zero_grad()
+
+        logits, embeddings_batch_Z_B = model(data_batch) # Model must return embeddings
+        u_for_batch = criterion_gcod.get_u_for_batch(u_indices_for_batch)
+
+        loss_model_batch, loss_u_batch = criterion_gcod(logits, embeddings_batch_Z_B, data_batch.y.squeeze(), u_for_batch, current_epoch_train_acc)
+
+        if torch.isnan(loss_model_batch) or torch.isinf(loss_model_batch):
+            print(f"Warning: Model loss is NaN/Inf in batch {batch_idx}. Skipping batch.")
+            # Potentially log more details about logits, embeddings, u_for_batch
+            continue
+        if torch.isnan(loss_u_batch) or torch.isinf(loss_u_batch):
+            print(f"Warning: U loss is NaN/Inf in batch {batch_idx}. Skipping u_step for this batch.")
+        else:
+             loss_u_batch.backward() # Backward for U loss
+             optimizer_u.step()
+             with torch.no_grad(): # Clamp U after step
+                 criterion_gcod.u_all_samples.clamp_(0.0, 1.0)
+
+
+        loss_model_batch.backward() # Backward for Model loss (retain_graph=True was removed as L_u backwarded first)
+        optimizer_model.step()
+        
+        total_loss_model_epoch += loss_model_batch.item() * data_batch.num_graphs # data_batch.num_graphs for PyG
+        if not (torch.isnan(loss_u_batch) or torch.isinf(loss_u_batch)):
+            total_loss_u_epoch += loss_u_batch.item() * data_batch.num_graphs
+
+    avg_loss_model = total_loss_model_epoch / len(data_loader.dataset) if len(data_loader.dataset) > 0 else 0
+    avg_loss_u = total_loss_u_epoch / len(data_loader.dataset) if len(data_loader.dataset) > 0 else 0
+    return avg_loss_model, avg_loss_u
+
+class GCODLoss(nn.Module):
+    def __init__(self, num_train_samples, num_classes, embedding_dim, device, initial_u_std=1e-9):
+        super(GCODLoss, self).__init__()
+        self.num_classes = num_classes
+        self.embedding_dim = embedding_dim
+        self.device = device
+        self.u_all_samples = nn.Parameter(torch.normal(mean=1e-8, std=initial_u_std, size=(num_train_samples,), device=device),requires_grad=True)
+        self.current_class_centroids = torch.zeros(num_classes, embedding_dim, device=device, requires_grad=False) # Centroids are not learned directly by model's optimizer
+        self.cross_entropy_noreduction = nn.CrossEntropyLoss(reduction='none')
+
+    def get_u_for_batch(self, indices):
+        return self.u_all_samples[indices.to(self.device).long()]
+
+    @torch.no_grad()
+    def update_class_centroids(self, embeddings_epoch, labels_epoch, u_values_epoch, epoch, total_epochs):
+        self.current_class_centroids.fill_(0.0)
+        counts = torch.zeros(self.num_classes, device=self.device)
+        for c in range(self.num_classes):
+            class_mask = (labels_epoch == c)
+            if class_mask.sum() == 0:
+                self.current_class_centroids[c] = torch.randn(self.embedding_dim, device=self.device) * 0.01
+                continue
+            class_embeddings = embeddings_epoch[class_mask]
+            class_u_values = u_values_epoch[class_mask]
+            percentage_to_use = 1.0 - 0.5 * (epoch / total_epochs)
+            num_samples_in_class = class_embeddings.size(0)
+            num_to_select = max(1, int(num_samples_in_class * percentage_to_use))
+            if num_samples_in_class > 0:
+                sorted_indices = torch.argsort(class_u_values)
+                selected_indices = sorted_indices[:num_to_select]
+                if len(selected_indices) > 0:
+                    centroid_c = class_embeddings[selected_indices].mean(dim=0)
+                    self.current_class_centroids[c] = centroid_c
+                else:
+                    self.current_class_centroids[c] = torch.randn(self.embedding_dim, device=self.device) * 0.01
+        norms = torch.norm(self.current_class_centroids, p=2, dim=1, keepdim=True)
+        self.current_class_centroids = self.current_class_centroids / (norms + 1e-8)
+
+    def calculate_soft_labels_y_bar(self, embeddings_batch, targets_batch_one_hot):
+        h_i = F.normalize(embeddings_batch, p=2, dim=1)
+        class_indices = torch.argmax(targets_batch_one_hot, dim=1)
+        h_c_for_batch = self.current_class_centroids[class_indices]
+        similarity = (h_i * h_c_for_batch).sum(dim=1)
+        y_bar_magnitudes = torch.clamp(similarity, min=0.0)
+        y_bar_batch = targets_batch_one_hot * y_bar_magnitudes.unsqueeze(1)
+        return y_bar_batch
+
+    def forward(self, logits, embeddings_batch, targets_batch, u_batch, training_accuracy_epoch):
+        batch_size = logits.size(0)
+        targets_one_hot = F.one_hot(targets_batch.long(), num_classes=self.num_classes).float().to(self.device)
+        y_bar_batch = self.calculate_soft_labels_y_bar(embeddings_batch, targets_one_hot)
+
+        diag_u_y_hard = torch.diag_embed(u_batch) @ targets_one_hot
+        modified_logits_L1 = logits + training_accuracy_epoch * diag_u_y_hard
+        loss1_per_sample = -torch.sum(y_bar_batch * F.log_softmax(modified_logits_L1, dim=1), dim=1)
+        L1 = loss1_per_sample.mean()
+
+        pred_probs = F.softmax(logits, dim=1)
+        y_hat_batch_one_hot = F.one_hot(torch.argmax(pred_probs, dim=1), num_classes=self.num_classes).float().to(self.device)
+        u_y_hard_term = u_batch.unsqueeze(1) * targets_one_hot
+        L2_term_inside_norm = y_hat_batch_one_hot + u_y_hard_term - targets_one_hot
+        L2 = (1.0 / self.num_classes) * L2_term_inside_norm.pow(2).sum(dim=1).mean()
+
+        model_prob_true_class = F.softmax(logits, dim=1).gather(1, targets_batch.long().unsqueeze(1)).squeeze(1)
+        model_prob_true_class_clamped = torch.clamp(model_prob_true_class, 1e-7, 1.0 - 1e-7)
+        u_batch_clamped = torch.clamp(u_batch, 1e-7, 1.0 - 1e-7)
+        target_kl_L3_scalar = torch.sigmoid(-torch.log(u_batch_clamped))
+        
+        # Clamp target_kl_L3_scalar as well to avoid issues with log((1-target)/(1-prob)) if target is exactly 1
+        target_kl_L3_scalar_clamped = torch.clamp(target_kl_L3_scalar, 1e-7, 1.0 - 1e-7)
+
+        kl_term_1 = target_kl_L3_scalar_clamped * torch.log(target_kl_L3_scalar_clamped / model_prob_true_class_clamped + 1e-7) # Added epsilon for log
+        kl_term_2 = (1 - target_kl_L3_scalar_clamped) * torch.log((1 - target_kl_L3_scalar_clamped) / (1 - model_prob_true_class_clamped + 1e-7) + 1e-7)
+
+        L3_per_sample = (1.0 - training_accuracy_epoch) * (kl_term_1 + kl_term_2)
+        L3 = L3_per_sample.mean()
+        if torch.isnan(L3) or torch.isinf(L3):
+            # print(f"Warning: L3 is NaN or Inf. L3_per_sample: {L3_per_sample}, training_acc: {training_accuracy_epoch}, target_kl: {target_kl_L3_scalar_clamped}, model_prob: {model_prob_true_class_clamped}")
+            L3 = torch.tensor(0.0, device=self.device) # Ensure L3 is differentiable even if 0
+
+        loss_model = L1 + L3
+        loss_u = L2
+        return loss_model, loss_u
 
 def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     """
@@ -56,24 +193,33 @@ def train(data_loader, model, optimizer, criterion, device, class_weights=None):
 
 
 def evaluate(data_loader, model, device, calculate_accuracy=False):
+    # ... (function body as provided - ensure it unpacks (output, _) from model)
     model.eval()
     correct = 0
     total = 0
-    predictions = []
+    predictions_list = [] # Renamed to avoid conflict
     with torch.no_grad():
-        for data in data_loader:
-            data = data.to(device)
-            output = model(data)
+        for data_item in data_loader: # data_loader now yields (data_batch, indices) or just data_batch
+            if isinstance(data_item, tuple): 
+                data_batch, _ = data_item # If using IndexedDataset for validation/test loader
+            else:
+                data_batch = data_item
+            
+            data_batch = data_batch.to(device)
+            
+            # Model returns (logits, embeddings) even in eval if return_embeddings=True
+            # We only need logits for evaluation.
+            output, _ = model(data_batch) # Unpack tuple
             pred = output.argmax(dim=1)
-            predictions.extend(pred.cpu().numpy())
+            predictions_list.extend(pred.cpu().numpy())
             if calculate_accuracy:
-                correct += (pred == data.y.squeeze()).sum().item()
-                total += data.y.size(0)
+                correct += (pred == data_batch.y.squeeze()).sum().item()
+                total += data_batch.y.size(0)
             
     if calculate_accuracy:
-        accuracy = correct / total
-        return accuracy, predictions
-    return predictions
+        accuracy = correct / total if total > 0 else 0
+        return accuracy, predictions_list
+    return predictions_list
 
 
 def main(args):
@@ -118,6 +264,10 @@ def main(args):
     BATCH_SIZE = 32
     NUM_LAYERS = 2 # Number of GINE layers in the model
 
+    LEARNING_RATE_U = 0.1 
+    INITIAL_U_STD = 1e-9
+    GCOD_EMBEDDING_DIM = HIDDEN_CHANNELS
+
     
     #transform
     my_transform = CombinedPreTransform(k_lap_pe=K_LAP_PE, num_structural_features=NUM_STRUCTURAL_FEATURES)
@@ -155,15 +305,20 @@ def main(args):
         train_dataset = train_dataset_full.index_select(train_indices)
         validation_dataset = train_dataset_full.index_select(val_indices)
 
-        model =  NNConvNet(
-            node_in_channels=NODE_FEATURE_DIM,
-            edge_feature_dim=EDGE_FEATURE_DIM, 
-            hidden_channels=HIDDEN_CHANNELS,
-            hidden_dim=HIDDEN_DIM,
-            out_channels=NUM_CLASSES,
+        num_samples_for_gcod_u = len(train_dataset)
+
+
+
+        model = NNConvNet(
+            node_in_channels=NODE_FEATURE_DIM, # Or node_feature_dim_from_model when loading
+            edge_feature_dim=EDGE_FEATURE_DIM,
+            out_channels_gnn=GCOD_EMBEDDING_DIM,      # GNN output dim
+            hidden_dim_edge_nn=HIDDEN_DIM,           # For NN inside NNConv
+            mlp_hidden_dim_factor=0.5,               # For MLP after GNN embeddings
+            out_channels_final=NUM_CLASSES,          # Final output classes
             num_layers=NUM_LAYERS,
-            dropout=DROPOUT_RATE,
-            ).to(device)
+            return_embeddings=True                   # Crucial for GCOD
+        ).to(device)
 
         
 
@@ -173,34 +328,86 @@ def main(args):
         #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
         criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
 
+        criterion_gcod = GCODLoss(num_train_samples=num_samples_for_gcod_u, 
+                                      num_classes=NUM_CLASSES, 
+                                      embedding_dim=GCOD_EMBEDDING_DIM, 
+                                      device=device,
+                                      initial_u_std=INITIAL_U_STD)
+        optimizer_u = optim.SGD([criterion_gcod.u_all_samples], lr=LEARNING_RATE_U)
 
-        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-        vali_loader = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
+        # --- DataLoaders with IndexedDataset for training ---
+        indexed_train_dataset = IndexedDataset(train_dataset)
+        train_loader = DataLoader(indexed_train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True if len(indexed_train_dataset) % BATCH_SIZE ==1 else False) # drop_last if last batch is size 1 and causes issues
         
+        # For validation, IndexedDataset is optional but evaluate function adapted for it
+        indexed_validation_dataset = IndexedDataset(validation_dataset)
+        vali_loader = DataLoader(indexed_validation_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
         best_val_acc = 0
+        best_epoch_val = 0
+        current_epoch_train_acc = 0.0
 
         # Training loop
-        for epoch in range(EPOCHS):
-            train_loss = train(train_loader, model, optimizer, criterion, device)
-            
-            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True) # criterion uses reduction='mean'
-            val_acc, _ = evaluate(vali_loader, model, device, calculate_accuracy=True) # criterion_val uses reduction='mean'
-            
-            print(f"Epoch {epoch+1}/{EPOCHS}, Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {val_acc:.4f}")
-            if (epoch + 1) % 10 == 0:
-                logging.info(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Acc: {val_acc:.4f}")
+        for epoch_num in range(EPOCHS):
+            model.eval() 
+            all_train_embeddings_list = []
+            all_train_labels_list = []
+            # u_values should correspond to the samples in train_dataset
+            u_values_for_centroids = criterion_gcod.u_all_samples.detach().clone()
 
-            # Save best model based on val_acc1 or val_acc2 (or average, or max)
+            with torch.no_grad():
+                # Create a temporary loader for train_dataset (not indexed_train_dataset)
+                temp_centroid_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE * 2, shuffle=False)
+                for data_item_for_centroid in temp_centroid_loader:
+                    data_item_for_centroid = data_item_for_centroid.to(device)
+                    # Model returns (logits, embeddings)
+                    _, emb = model(data_item_for_centroid) 
+                    all_train_embeddings_list.append(emb.cpu())
+                    all_train_labels_list.append(data_item_for_centroid.y.cpu())
+
+            if not all_train_embeddings_list: # Handle empty train_dataset case
+                logging.warning(f"Epoch {epoch_num+1}: train_dataset is empty. Skipping centroid update.")
+            else:
+                all_train_embeddings_tensor = torch.cat(all_train_embeddings_list, dim=0)
+                all_train_labels_tensor = torch.cat(all_train_labels_list, dim=0).squeeze()
+                    
+                criterion_gcod.update_class_centroids(
+                    all_train_embeddings_tensor.to(device), 
+                    all_train_labels_tensor.to(device), 
+                    u_values_for_centroids.to(device), 
+                    epoch_num, EPOCHS)
+                
+
+            model.train()
+
+            train_loss_model, train_loss_u = train_gcod(
+                    train_loader, model, criterion_gcod, 
+                    optimizer, optimizer_u, device, 
+                    current_epoch_train_acc
+                )
+            train_loss_display = train_loss_model
+            
+            current_epoch_train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True) # Uses updated model
+            val_acc, _ = evaluate(vali_loader, model, device, calculate_accuracy=True)
+            
+            log_msg_epoch = f"Epoch {epoch_num+1}/{EPOCHS}, Train Loss: {train_loss_display:.4f}"
+            log_msg_epoch += f", U Loss: {train_loss_u:.4f}"
+            log_msg_epoch += f", Train Acc: {current_epoch_train_acc:.4f}, Val Acc: {val_acc:.4f}"
+            print(log_msg_epoch)
+            if (epoch_num + 1) % 10 == 0: logging.info(log_msg_epoch)
+        
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
-                best_epoch = epoch + 1
+                best_epoch = epoch_num + 1
                 checkpoint_path = os.path.join(checkpoints_folder, f"model_{test_dir_name}_epoch_{best_epoch}.pth")
                 torch.save({
                     'epoch': best_epoch,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(), # Optional, if you might resume training
                     'best_val_acc': best_val_acc,
-                    'norm_params': norm_params, 
+                    'norm_params': norm_params,
+                    'gcod_embedding_dim': GCOD_EMBEDDING_DIM, # Save this
+                    'u_values': criterion_gcod.u_all_samples.detach().cpu()
                 }, checkpoint_path)
                 print(f"+++++ Saved new best model at epoch {best_epoch} with val acc {best_val_acc:.4f}")
             
@@ -217,15 +424,17 @@ def main(args):
     print(f"Loading best model from epoch {best_epoch} for model")
 
 
-    model =  NNConvNet(
-            node_in_channels=NODE_FEATURE_DIM,
-    edge_feature_dim=EDGE_FEATURE_DIM, 
-    hidden_channels=HIDDEN_CHANNELS,
-    hidden_dim=HIDDEN_DIM,
-    out_channels=NUM_CLASSES,
-    num_layers=NUM_LAYERS,
-    dropout=DROPOUT_RATE,
+    model = NNConvNet(
+        node_in_channels=NODE_FEATURE_DIM, # Or node_feature_dim_from_model when loading
+        edge_feature_dim=EDGE_FEATURE_DIM,
+        out_channels_gnn=GCOD_EMBEDDING_DIM,      # GNN output dim
+        hidden_dim_edge_nn=HIDDEN_DIM,           # For NN inside NNConv
+        mlp_hidden_dim_factor=0.5,               # For MLP after GNN embeddings
+        out_channels_final=NUM_CLASSES,          # Final output classes
+        num_layers=NUM_LAYERS,
+        return_embeddings=True                   # Crucial for GCOD
     ).to(device)
+
 
     model.load_state_dict(checkpoint['model_state_dict'])
 
