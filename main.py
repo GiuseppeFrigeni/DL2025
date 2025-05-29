@@ -7,7 +7,7 @@ from torch_geometric.loader import DataLoader
 from torch_geometric import seed_everything
 from source.transforms import StructuralFeatures, NormalizeNodeFeatures, CombinedPreTransform
 from source.model import  NNConvNet, GINENetForGCOD
-from source.loss import SCELoss
+from source.loss import SCELoss, GCODLoss
 import pandas as pd
 from torch_geometric.data import Dataset # Or your specific dataset class
 import torch.nn as nn
@@ -55,8 +55,6 @@ def train_gcod(data_loader, model, criterion_gcod, optimizer_model, optimizer_u,
             criterion_gcod.u_all_samples.clamp_(0.0, 1.0)
 
         # Second backward pass (for model parameters)
-        # Now this can proceed because retain_graph=True was set on the previous backward call
-        # for the shared parts of the graph.
         loss_model_batch.backward() 
         optimizer_model.step()
         
@@ -67,87 +65,6 @@ def train_gcod(data_loader, model, criterion_gcod, optimizer_model, optimizer_u,
     avg_loss_u = total_loss_u_epoch / len(data_loader.dataset) if len(data_loader.dataset) > 0 else 0
     return avg_loss_model, avg_loss_u
 
-class GCODLoss(nn.Module):
-    def __init__(self, num_train_samples, num_classes, embedding_dim, device, initial_u_std=1e-9):
-        super(GCODLoss, self).__init__()
-        self.num_classes = num_classes
-        self.embedding_dim = embedding_dim
-        self.device = device
-        self.u_all_samples = nn.Parameter(torch.normal(mean=1e-8, std=initial_u_std, size=(num_train_samples,), device=device),requires_grad=True)
-        self.current_class_centroids = torch.zeros(num_classes, embedding_dim, device=device, requires_grad=False) # Centroids are not learned directly by model's optimizer
-        self.cross_entropy_noreduction = nn.CrossEntropyLoss(reduction='none')
-
-    def get_u_for_batch(self, indices):
-        return self.u_all_samples[indices.to(self.device).long()]
-
-    @torch.no_grad()
-    def update_class_centroids(self, embeddings_epoch, labels_epoch, u_values_epoch, epoch, total_epochs):
-        self.current_class_centroids.fill_(0.0)
-        counts = torch.zeros(self.num_classes, device=self.device)
-        for c in range(self.num_classes):
-            class_mask = (labels_epoch == c)
-            if class_mask.sum() == 0:
-                self.current_class_centroids[c] = torch.randn(self.embedding_dim, device=self.device) * 0.01
-                continue
-            class_embeddings = embeddings_epoch[class_mask]
-            class_u_values = u_values_epoch[class_mask]
-            percentage_to_use = 1.0 - 0.5 * (epoch / total_epochs)
-            num_samples_in_class = class_embeddings.size(0)
-            num_to_select = max(1, int(num_samples_in_class * percentage_to_use))
-            if num_samples_in_class > 0:
-                sorted_indices = torch.argsort(class_u_values)
-                selected_indices = sorted_indices[:num_to_select]
-                if len(selected_indices) > 0:
-                    centroid_c = class_embeddings[selected_indices].mean(dim=0)
-                    self.current_class_centroids[c] = centroid_c
-                else:
-                    self.current_class_centroids[c] = torch.randn(self.embedding_dim, device=self.device) * 0.01
-        norms = torch.norm(self.current_class_centroids, p=2, dim=1, keepdim=True)
-        self.current_class_centroids = self.current_class_centroids / (norms + 1e-8)
-
-    def calculate_soft_labels_y_bar(self, embeddings_batch, targets_batch_one_hot):
-        h_i = F.normalize(embeddings_batch, p=2, dim=1)
-        class_indices = torch.argmax(targets_batch_one_hot, dim=1)
-        h_c_for_batch = self.current_class_centroids[class_indices]
-        similarity = (h_i * h_c_for_batch).sum(dim=1)
-        y_bar_magnitudes = torch.clamp(similarity, min=0.0)
-        y_bar_batch = targets_batch_one_hot * y_bar_magnitudes.unsqueeze(1)
-        return y_bar_batch
-
-    def forward(self, logits, embeddings_batch, targets_batch, u_batch, training_accuracy_epoch):
-        batch_size = logits.size(0)
-        targets_one_hot = F.one_hot(targets_batch.long(), num_classes=self.num_classes).float().to(self.device)
-        y_bar_batch = self.calculate_soft_labels_y_bar(embeddings_batch, targets_one_hot)
-
-        diag_u_y_hard = torch.diag_embed(u_batch) @ targets_one_hot
-        modified_logits_L1 = logits + training_accuracy_epoch * diag_u_y_hard
-        loss1_per_sample = -torch.sum(y_bar_batch * F.log_softmax(modified_logits_L1, dim=1), dim=1)
-        L1 = loss1_per_sample.mean()
-
-        pred_probs = F.softmax(logits, dim=1)
-        y_hat_batch_one_hot = F.one_hot(torch.argmax(pred_probs, dim=1), num_classes=self.num_classes).float().to(self.device)
-        u_y_hard_term = u_batch.unsqueeze(1) * targets_one_hot
-        L2_term_inside_norm = y_hat_batch_one_hot + u_y_hard_term - targets_one_hot
-        L2 = (1.0 / self.num_classes) * L2_term_inside_norm.pow(2).sum(dim=1).mean()
-
-        model_prob_true_class = F.softmax(logits, dim=1).gather(1, targets_batch.long().unsqueeze(1)).squeeze(1)
-        model_prob_true_class_clamped = torch.clamp(model_prob_true_class, 1e-7, 1.0 - 1e-7)
-        u_batch_clamped = torch.clamp(u_batch, 1e-7, 1.0 - 1e-7)
-        target_kl_L3_scalar = torch.sigmoid(-torch.log(u_batch_clamped))
-        
-        target_kl_L3_scalar_clamped = torch.clamp(target_kl_L3_scalar, 1e-7, 1.0 - 1e-7)
-
-        kl_term_1 = target_kl_L3_scalar_clamped * torch.log(target_kl_L3_scalar_clamped / model_prob_true_class_clamped + 1e-7) # Added epsilon for log
-        kl_term_2 = (1 - target_kl_L3_scalar_clamped) * torch.log((1 - target_kl_L3_scalar_clamped) / (1 - model_prob_true_class_clamped + 1e-7) + 1e-7)
-
-        L3_per_sample = (1.0 - training_accuracy_epoch) * (kl_term_1 + kl_term_2)
-        L3 = L3_per_sample.mean()
-        if torch.isnan(L3) or torch.isinf(L3):
-            L3 = torch.tensor(0.0, device=self.device) # Ensure L3 is differentiable even if 0
-
-        loss_model = L1 + L3
-        loss_u = L2
-        return loss_model, loss_u
 
 def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     """
@@ -171,32 +88,17 @@ def get_node_feature_stats(dataset: Dataset, feature_dim: int):
     return min_val, max_val
 
 
-def train(data_loader, model, optimizer, criterion, device, class_weights=None):
-    model.train()
-    total_loss = 0
-    for data in data_loader:
-        data = data.to(device)
-        optimizer.zero_grad()
-        output = model(data)  # Assuming model returns a tuple
-        loss = criterion(output, data.y.squeeze())
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
-
-    return total_loss / len(data_loader)
-
-
 def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
     correct = 0
     total = 0
     predictions_list = [] 
     with torch.no_grad():
-        for data_batch in data_loader: # DataLoader now yields PyG Data/Batch objects directly
-            # No need to check for tuple if using the _for_eval loaders
-            data_batch = data_batch.to(device) # This should now work
+        for data_batch in data_loader:
+            #
+            data_batch = data_batch.to(device) 
             
-            output, _ = model(data_batch) # Assuming model returns (logits, embeddings)
+            output, _ = model(data_batch) 
             pred = output.argmax(dim=1)
             predictions_list.extend(pred.cpu().numpy())
             if calculate_accuracy:
@@ -212,15 +114,13 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
 def main(args):
     seed_everything(42)  # Set random seed for reproducibility
 
-    model_name = 'NNConvNet'  # Name of the model to be used in logging and saving
-
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     test_dir_name = os.path.basename(os.path.dirname(args.test_path))
 
     # Define log file path relative to the script's directory
-    logs_folder = os.path.join(os.getcwd(), "logs", test_dir_name, model_name)
+    logs_folder = os.path.join(os.getcwd(), "logs", test_dir_name)
     os.makedirs(logs_folder, exist_ok=True)
     log_file = os.path.join(logs_folder, "training.log")
     logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -237,42 +137,35 @@ def main(args):
     LEARNING_RATE = 1e-3
     EPOCHS = 300 
     WEIGHT_DECAY = 1e-4 # Add some regularization
-    ALPHA = 1.0  # Weight for Cross Entropy
-    BETA = 0.5  # Weight for Reverse Cross Entropy
     K_LAP_PE = 8
     NUM_STRUCTURAL_FEATURES = 3    # Since we have 1st and 2nd degree
     NODE_FEATURE_DIM = K_LAP_PE + NUM_STRUCTURAL_FEATURES
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.3
-    #use_batch_norm = True
-    HIDDEN_DIM = 1024 # Hidden dimension for GAT layers
-    HIDDEN_CHANNELS = 32 # Hidden dimension for GINE layers
     BATCH_SIZE = 32
-    NUM_LAYERS = 2 # Number of GINE layers in the model
+
+
 
     LEARNING_RATE_U = 1 
     INITIAL_U_STD = 1e-9
-    GCOD_EMBEDDING_DIM = HIDDEN_CHANNELS
 
-    GNN_TYPE = 'GINE' # Switch to GINE
     EDGE_FEATURE_DIM = 7 # Your edge feature dimension
     GIN_HIDDEN_CHANNELS = 300 # Or your desired hidden size for GINE
     GIN_NUM_LAYERS = 5
     GIN_MLP_HIDDEN_CHANNELS = 128
     GCOD_EMBEDDING_DIM = GIN_HIDDEN_CHANNELS
-    # GINE specific params (optional, defaults are often fine)
+    DROPOUT_RATE = 0.3
     GINE_EPS = 0.0
     GINE_TRAIN_EPS = False
+
+    if test_dir_name=='B':
+        DROPOUT_RATE= 0
 
     
     #transform
     my_transform = CombinedPreTransform(k_lap_pe=K_LAP_PE, num_structural_features=NUM_STRUCTURAL_FEATURES)
 
-
-
     if args.train_path:
-
         # Remove previous checkpoints for the same test dataset
         for filePath in os.listdir(checkpoints_folder):
             if test_dir_name in filePath:
@@ -303,39 +196,25 @@ def main(args):
         num_samples_for_gcod_u = len(train_dataset)
 
 
-        if GNN_TYPE == 'GINE':
-            model = GINENetForGCOD(
-        node_in_channels=NODE_FEATURE_DIM,
-        edge_feature_dim=EDGE_FEATURE_DIM, # Pass edge feature dim
-        gnn_hidden_channels=GIN_HIDDEN_CHANNELS,
-        num_gnn_layers=GIN_NUM_LAYERS,
-        mlp_hidden_channels=GIN_MLP_HIDDEN_CHANNELS,
-        out_channels_final=NUM_CLASSES,
-        dropout_rate=DROPOUT_RATE,
-        return_embeddings=True,
-        pooling_type='mean',
-        eps=GINE_EPS,
-        train_eps=GINE_TRAIN_EPS
+
+        model = GINENetForGCOD(
+            node_in_channels=NODE_FEATURE_DIM,
+            edge_feature_dim=EDGE_FEATURE_DIM, # Pass edge feature dim
+            gnn_hidden_channels=GIN_HIDDEN_CHANNELS,
+            num_gnn_layers=GIN_NUM_LAYERS,
+            mlp_hidden_channels=GIN_MLP_HIDDEN_CHANNELS,
+            out_channels_final=NUM_CLASSES,
+            dropout_rate=DROPOUT_RATE,
+            return_embeddings=True,
+            pooling_type='mean',
+            eps=GINE_EPS,
+            train_eps=GINE_TRAIN_EPS
     ).to(device)
-        else:
-            model = NNConvNet(
-            node_in_channels=NODE_FEATURE_DIM, # Or node_feature_dim_from_model when loading
-            edge_feature_dim=EDGE_FEATURE_DIM,
-            out_channels_gnn=GCOD_EMBEDDING_DIM,      # GNN output dim
-            hidden_dim_edge_nn=HIDDEN_DIM,           # For NN inside NNConv
-            mlp_hidden_dim_factor=0.5,               # For MLP after GNN embeddings
-            out_channels_final=NUM_CLASSES,          # Final output classes
-            num_layers=NUM_LAYERS,
-            return_embeddings=True                   # Crucial for GCOD
-        ).to(device)
 
-        
-
+    
         
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
-        #criterion = torch.nn.CrossEntropyLoss() # Standard CE for now
-        criterion = SCELoss(alpha=ALPHA, beta=BETA, num_classes=NUM_CLASSES, reduction='mean')
 
         criterion_gcod = GCODLoss(num_train_samples=num_samples_for_gcod_u, 
                                       num_classes=NUM_CLASSES, 
@@ -349,12 +228,10 @@ def main(args):
         train_loader_for_gcod = DataLoader(indexed_train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) 
 
         # For evaluation (does not need indices from IndexedDataset directly in evaluate)
-        # Pass the original PyG datasets to these loaders
         train_loader_for_eval = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True) # Use train_dataset
         vali_loader_for_eval = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True) # Use validation_dataset
 
         best_val_acc = 0
-        best_epoch_val = 0
         current_epoch_train_acc = 0.0
 
         # Training loop
