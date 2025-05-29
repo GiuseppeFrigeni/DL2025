@@ -9,4 +9,4 @@ GINE and NNConv were the only ones that gave any sign of learning.
 
 I tried a  variety of different methods like Symmetric CrossEntropy, Co-teaching and Co-teaching plus, but the thing that worked best in the end was recreating the GCOD loss from the paper [Wani et al. (2024).](https://arxiv.org/abs/2412.08419)
 
- In [main.py](https://github.com/GiuseppeFrigeni/DL2025/blob/main/source/main.py) you can see the hyperparameter used are the same of the paper linked. Unfortunately I finished all the GPU time even after buying Colab Pro on both Kaggle and Colab and I couldn't try more configurations of hyperparameters for the GCOD approach.
+ In [main.py](https://github.com/GiuseppeFrigeni/DL2025/blob/main/source/main.py) you can see the hyperparameter used are the same of the paper linked. Unfortunately I finished all the GPU time even after buying Colab Pro on both Kaggle and Colab and I couldn't train the model for more epochs and try more configurations of hyperparameters for the GCOD approach.
