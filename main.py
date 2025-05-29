@@ -227,7 +227,7 @@ def main(args):
     logging.getLogger().addHandler(logging.StreamHandler()) 
 
     # Define checkpoint path relative to the script's directory
-    checkpoints_folder = os.path.join(script_dir, "saved_models", test_dir_name)
+    checkpoints_folder = os.path.join(script_dir, "checkpoint", test_dir_name)
     os.makedirs(checkpoints_folder, exist_ok=True)
 
     submission_dir = os.path.join(os.getcwd(), 'submission')
@@ -244,7 +244,7 @@ def main(args):
     NODE_FEATURE_DIM = K_LAP_PE + NUM_STRUCTURAL_FEATURES
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
-    DROPOUT_RATE = 0.3
+    DROPOUT_RATE = 0
     #use_batch_norm = True
     HIDDEN_DIM = 1024 # Hidden dimension for GAT layers
     HIDDEN_CHANNELS = 32 # Hidden dimension for GINE layers
