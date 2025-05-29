@@ -457,15 +457,18 @@ def main(args):
     print(f"Loading best model from epoch {best_epoch} for model")
 
 
-    model = NNConvNet(
-        node_in_channels=NODE_FEATURE_DIM, # Or node_feature_dim_from_model when loading
-        edge_feature_dim=EDGE_FEATURE_DIM,
-        out_channels_gnn=GCOD_EMBEDDING_DIM,      # GNN output dim
-        hidden_dim_edge_nn=HIDDEN_DIM,           # For NN inside NNConv
-        mlp_hidden_dim_factor=0.5,               # For MLP after GNN embeddings
-        out_channels_final=NUM_CLASSES,          # Final output classes
-        num_layers=NUM_LAYERS,
-        return_embeddings=True                   # Crucial for GCOD
+    model = GINENetForGCOD(
+        node_in_channels=NODE_FEATURE_DIM,
+        edge_feature_dim=EDGE_FEATURE_DIM, # Pass edge feature dim
+        gnn_hidden_channels=GIN_HIDDEN_CHANNELS,
+        num_gnn_layers=GIN_NUM_LAYERS,
+        mlp_hidden_channels=GIN_MLP_HIDDEN_CHANNELS,
+        out_channels_final=NUM_CLASSES,
+        dropout_rate=DROPOUT_RATE,
+        return_embeddings=True,
+        pooling_type='mean',
+        eps=GINE_EPS,
+        train_eps=GINE_TRAIN_EPS
     ).to(device)
 
 
