@@ -237,7 +237,7 @@ def main(args):
 
     NUM_CLASSES = 6    
     LEARNING_RATE = 1e-3
-    EPOCHS = 500 
+    EPOCHS = 300 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     ALPHA = 1.0  # Weight for Cross Entropy
     BETA = 0.5  # Weight for Reverse Cross Entropy
