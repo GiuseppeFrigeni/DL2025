@@ -82,9 +82,6 @@ class CombinedPreTransform(BaseTransform):
         self.expected_total_features = self.num_structural_features + self.k_lap_pe
 
         if self.k_lap_pe > 0:
-            # attr_name='lap_pe': PEs are temporarily stored in data.lap_pe then concatenated to data.x.
-            # If data.x doesn't exist, it will create data.x from PE.
-            # It handles padding if num_nodes < k_lap_pe.
             self.lap_pe_transform = AddLaplacianEigenvectorPE(
                 k=k_lap_pe, attr_name='lap_pe', is_undirected=True
             )
@@ -103,7 +100,6 @@ class CombinedPreTransform(BaseTransform):
                      data.x = torch.zeros((data.num_nodes, self.num_structural_features), 
                                           dtype=torch.float, device=data.edge_index.device if data.edge_index is not None else torch.device('cpu'))
 
-                # LapPE transform will append k_lap_pe features to data.x
                 data = self.lap_pe_transform(data)
                 data.x = torch.cat((data.x, data.lap_pe), dim=1)
             else: # No nodes, ensure data.x is (0, total_features)

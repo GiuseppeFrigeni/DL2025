@@ -1,20 +1,20 @@
-2025-05-27 15:03:48,715 - Epoch 10/200 - Train Loss: 0.9809, Train Acc: 0.6066, Val Acc: 0.6260
-2025-05-27 15:08:37,349 - Epoch 20/200 - Train Loss: 0.8268, Train Acc: 0.7263, Val Acc: 0.7223
-2025-05-27 15:13:26,058 - Epoch 30/200 - Train Loss: 0.7425, Train Acc: 0.7222, Val Acc: 0.7189
-2025-05-27 15:18:14,462 - Epoch 40/200 - Train Loss: 0.6679, Train Acc: 0.7467, Val Acc: 0.7330
-2025-05-27 15:23:02,729 - Epoch 50/200 - Train Loss: 0.6344, Train Acc: 0.7560, Val Acc: 0.7505
-2025-05-27 15:27:50,836 - Epoch 60/200 - Train Loss: 0.6162, Train Acc: 0.7544, Val Acc: 0.7471
-2025-05-27 15:32:39,070 - Epoch 70/200 - Train Loss: 0.5974, Train Acc: 0.7517, Val Acc: 0.7471
-2025-05-27 15:37:27,019 - Epoch 80/200 - Train Loss: 0.5829, Train Acc: 0.7605, Val Acc: 0.7544
-2025-05-27 15:42:15,078 - Epoch 90/200 - Train Loss: 0.5683, Train Acc: 0.7698, Val Acc: 0.7592
-2025-05-27 15:47:03,313 - Epoch 100/200 - Train Loss: 0.5668, Train Acc: 0.7611, Val Acc: 0.7524
-2025-05-27 15:51:51,383 - Epoch 110/200 - Train Loss: 0.5515, Train Acc: 0.7606, Val Acc: 0.7510
-2025-05-27 15:56:39,431 - Epoch 120/200 - Train Loss: 0.5433, Train Acc: 0.7698, Val Acc: 0.7612
-2025-05-27 16:01:27,330 - Epoch 130/200 - Train Loss: 0.5332, Train Acc: 0.7636, Val Acc: 0.7534
-2025-05-27 16:06:15,362 - Epoch 140/200 - Train Loss: 0.5192, Train Acc: 0.7736, Val Acc: 0.7612
-2025-05-27 16:11:03,389 - Epoch 150/200 - Train Loss: 0.5327, Train Acc: 0.7705, Val Acc: 0.7607
-2025-05-27 16:15:51,603 - Epoch 160/200 - Train Loss: 0.5215, Train Acc: 0.7679, Val Acc: 0.7573
-2025-05-27 16:20:40,100 - Epoch 170/200 - Train Loss: 0.5348, Train Acc: 0.7720, Val Acc: 0.7578
-2025-05-27 16:25:28,376 - Epoch 180/200 - Train Loss: 0.5108, Train Acc: 0.7736, Val Acc: 0.7626
-2025-05-27 16:30:16,553 - Epoch 190/200 - Train Loss: 0.5180, Train Acc: 0.7673, Val Acc: 0.7549
-2025-05-27 16:35:04,790 - Epoch 200/200 - Train Loss: 0.5117, Train Acc: 0.7707, Val Acc: 0.7607
+2025-05-29 17:33:29,360 - Epoch 10/300, Train Loss: 0.3420, U Loss: 0.1174, Train Acc: 0.6417, Val Acc: 0.1960
+2025-05-29 17:37:03,964 - Epoch 20/300, Train Loss: 0.1746, U Loss: 0.0905, Train Acc: 0.6954, Val Acc: 0.2267
+2025-05-29 17:40:38,645 - Epoch 30/300, Train Loss: 0.1102, U Loss: 0.0754, Train Acc: 0.6829, Val Acc: 0.4173
+2025-05-29 17:44:12,612 - Epoch 40/300, Train Loss: 0.1716, U Loss: 0.0688, Train Acc: 0.7426, Val Acc: 0.7271
+2025-05-29 17:47:47,293 - Epoch 50/300, Train Loss: 0.1172, U Loss: 0.0613, Train Acc: 0.7490, Val Acc: 0.7354
+2025-05-29 17:51:22,762 - Epoch 60/300, Train Loss: 0.1069, U Loss: 0.0567, Train Acc: 0.7641, Val Acc: 0.7481
+2025-05-29 17:54:56,963 - Epoch 70/300, Train Loss: 0.1256, U Loss: 0.0558, Train Acc: 0.7652, Val Acc: 0.7544
+2025-05-29 17:58:32,557 - Epoch 80/300, Train Loss: 0.1212, U Loss: 0.0530, Train Acc: 0.7640, Val Acc: 0.7515
+2025-05-29 18:02:07,363 - Epoch 90/300, Train Loss: 0.1295, U Loss: 0.0526, Train Acc: 0.7523, Val Acc: 0.7388
+2025-05-29 18:05:41,474 - Epoch 100/300, Train Loss: 0.1029, U Loss: 0.0505, Train Acc: 0.7608, Val Acc: 0.7422
+2025-05-29 18:09:16,621 - Epoch 110/300, Train Loss: 0.0933, U Loss: 0.0497, Train Acc: 0.7659, Val Acc: 0.7529
+2025-05-29 18:12:50,385 - Epoch 120/300, Train Loss: 0.1049, U Loss: 0.0491, Train Acc: 0.7651, Val Acc: 0.7602
+2025-05-29 18:16:25,807 - Epoch 130/300, Train Loss: 0.1088, U Loss: 0.0480, Train Acc: 0.7675, Val Acc: 0.7524
+2025-05-29 18:20:00,353 - Epoch 140/300, Train Loss: 0.1064, U Loss: 0.0459, Train Acc: 0.7744, Val Acc: 0.7607
+2025-05-29 18:23:35,728 - Epoch 150/300, Train Loss: 0.0955, U Loss: 0.0465, Train Acc: 0.7602, Val Acc: 0.7422
+2025-05-29 18:27:11,207 - Epoch 160/300, Train Loss: 0.0964, U Loss: 0.0447, Train Acc: 0.7703, Val Acc: 0.7578
+2025-05-29 18:30:45,984 - Epoch 170/300, Train Loss: 0.0980, U Loss: 0.0457, Train Acc: 0.7741, Val Acc: 0.7651
+2025-05-29 18:34:20,341 - Epoch 180/300, Train Loss: 0.0739, U Loss: 0.0440, Train Acc: 0.7591, Val Acc: 0.7398
+2025-05-29 18:37:55,070 - Epoch 190/300, Train Loss: 0.1185, U Loss: 0.0478, Train Acc: 0.7736, Val Acc: 0.7495
+2025-05-29 18:41:30,566 - Epoch 200/300, Train Loss: 0.0748, U Loss: 0.0444, Train Acc: 0.7764, Val Acc: 0.7661

@@ -12,8 +12,6 @@ def dictToGraphObject(graph_dict):
     
     edge_attr_raw = graph_dict.get("edge_attr")
     if edge_attr_raw is not None and len(edge_attr_raw) > 0:
-        # Assuming edge_attr_raw is already in [num_edges, num_edge_features] format
-        # as per the dummy data generation in the example.
         edge_attr = torch.tensor(edge_attr_raw, dtype=torch.float)
     else:
         edge_attr = None
@@ -43,16 +41,14 @@ def dictToGraphObject(graph_dict):
 class GraphDataset(Dataset):
     def __init__(self, raw_path, transform=None, pre_transform=None, pre_filter=None, force_reload=False):
         self.raw_path_arg = os.path.abspath(raw_path)
-        # self.force_reload_flag = force_reload # Will be passed to super
 
         _root = os.path.dirname(self.raw_path_arg)
         self._raw_filename_basename = os.path.basename(self.raw_path_arg)
         
-        # Robustly derive processed_file_basename
         name = self._raw_filename_basename
         if name.endswith(".json.gz"):
             base = name[:-len(".json.gz")]
-        elif name.endswith(".tar.gz"): # Example: keep .tar part for things like tarballs
+        elif name.endswith(".tar.gz"): 
             base = name[:-len(".gz")] 
         elif name.endswith(".gz"):
             base = name[:-len(".gz")]

@@ -138,7 +138,7 @@ def main(args):
     EPOCHS = 300 
     WEIGHT_DECAY = 1e-4 # Add some regularization
     K_LAP_PE = 8
-    NUM_STRUCTURAL_FEATURES = 3    # Since we have 1st and 2nd degree
+    NUM_STRUCTURAL_FEATURES = 3    
     NODE_FEATURE_DIM = K_LAP_PE + NUM_STRUCTURAL_FEATURES
     NUM_CLASSES = 6
     EDGE_FEATURE_DIM = 7
@@ -149,8 +149,8 @@ def main(args):
     LEARNING_RATE_U = 1 
     INITIAL_U_STD = 1e-9
 
-    EDGE_FEATURE_DIM = 7 # Your edge feature dimension
-    GIN_HIDDEN_CHANNELS = 300 # Or your desired hidden size for GINE
+    EDGE_FEATURE_DIM = 7 
+    GIN_HIDDEN_CHANNELS = 300 
     GIN_NUM_LAYERS = 5
     GIN_MLP_HIDDEN_CHANNELS = 128
     GCOD_EMBEDDING_DIM = GIN_HIDDEN_CHANNELS
@@ -199,7 +199,7 @@ def main(args):
 
         model = GINENetForGCOD(
             node_in_channels=NODE_FEATURE_DIM,
-            edge_feature_dim=EDGE_FEATURE_DIM, # Pass edge feature dim
+            edge_feature_dim=EDGE_FEATURE_DIM, 
             gnn_hidden_channels=GIN_HIDDEN_CHANNELS,
             num_gnn_layers=GIN_NUM_LAYERS,
             mlp_hidden_channels=GIN_MLP_HIDDEN_CHANNELS,
@@ -283,8 +283,8 @@ def main(args):
             print(log_msg_epoch)
             if (epoch_num + 1) % 10 == 0: 
                 logging.info(log_msg_epoch)
-                with torch.no_grad(): # Ensure no gradients are computed for this
-                    u_values = criterion_gcod.u_all_samples.cpu().numpy() # Move to CPU and convert to numpy
+                with torch.no_grad():
+                    u_values = criterion_gcod.u_all_samples.cpu().numpy()
                     
                     u_min = np.min(u_values)
                     u_max = np.max(u_values)
@@ -313,7 +313,7 @@ def main(args):
                 torch.save({
                     'epoch': best_epoch,
                     'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(), # Optional, if you might resume training
+                    'optimizer_state_dict': optimizer.state_dict(), 
                     'best_val_acc': best_val_acc,
                     'norm_params': norm_params,
                     'gcod_embedding_dim': GCOD_EMBEDDING_DIM, # Save this
