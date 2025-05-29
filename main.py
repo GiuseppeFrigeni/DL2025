@@ -350,12 +350,12 @@ def main(args):
 
         # For GCOD training (needs indices)
         indexed_train_dataset = IndexedDataset(train_dataset)
-        train_loader_for_gcod = DataLoader(indexed_train_dataset, batch_size=BATCH_SIZE, shuffle=True) 
+        train_loader_for_gcod = DataLoader(indexed_train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) 
 
         # For evaluation (does not need indices from IndexedDataset directly in evaluate)
         # Pass the original PyG datasets to these loaders
-        train_loader_for_eval = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False) # Use train_dataset
-        vali_loader_for_eval = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False) # Use validation_dataset
+        train_loader_for_eval = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True) # Use train_dataset
+        vali_loader_for_eval = DataLoader(validation_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True) # Use validation_dataset
 
         best_val_acc = 0
         best_epoch_val = 0
