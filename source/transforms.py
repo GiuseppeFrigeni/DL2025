@@ -1,5 +1,5 @@
 import torch
-from torch_geometric.transforms import BaseTransform
+from torch_geometric.transforms import BaseTransform, AddLaplacianEigenvectorPE
 from torch_geometric.utils import degree, to_networkx
 import networkx as nx
 from torch_geometric.data import Data
@@ -70,4 +70,50 @@ class NormalizeNodeFeatures(BaseTransform):
                     
 
             data.x = x_normalized
+        return data
+    
+
+class CombinedPreTransform(BaseTransform):
+    def __init__(self, k_lap_pe, num_structural_features=3):
+        super().__init__()
+        self.structural_features = StructuralFeatures()
+        self.k_lap_pe = k_lap_pe
+        self.num_structural_features = num_structural_features
+        self.expected_total_features = self.num_structural_features + self.k_lap_pe
+
+        if self.k_lap_pe > 0:
+            # cat=True: concatenates PE to data.x.
+            # attr_name='lap_pe': PEs are temporarily stored in data.lap_pe then concatenated to data.x.
+            # If data.x doesn't exist, it will create data.x from PE.
+            # It handles padding if num_nodes < k_lap_pe.
+            self.lap_pe_transform = AddLaplacianEigenvectorPE(
+                k=k_lap_pe, attr_name='lap_pe', cat=True, is_undirected=True
+            )
+        else:
+            self.lap_pe_transform = None
+
+    def __call__(self, data):
+        # Apply structural features first
+        data = self.structural_features(data) # This should create data.x (N, num_structural_features) or (0, num_structural_features)
+
+        if self.lap_pe_transform is not None:
+            if data.num_nodes > 0:
+                # If StructuralFeatures produced no data.x (e.g. graph has nodes but SF decided no features)
+                # ensure data.x exists before LapPE if it's going to cat to it.
+                if data.x is None or data.x.numel() == 0:
+                     data.x = torch.zeros((data.num_nodes, self.num_structural_features), 
+                                          dtype=torch.float, device=data.edge_index.device if data.edge_index is not None else torch.device('cpu'))
+
+                # LapPE transform will append k_lap_pe features to data.x
+                data = self.lap_pe_transform(data)
+            else: # No nodes, ensure data.x is (0, total_features)
+                data.x = torch.empty((0, self.expected_total_features), dtype=torch.float)
+        
+        # Ensure data.x has the correct final dimension, especially for 0-node graphs
+        # or if LapPE was not applied (k_lap_pe=0)
+        if data.x is not None and data.x.shape[0] == 0 and data.x.shape[1] != self.expected_total_features:
+            data.x = torch.empty((0, self.expected_total_features), dtype=data.x.dtype, device=data.x.device)
+        elif data.x is None and data.num_nodes == 0: # Should be handled by SF already
+            data.x = torch.empty((0, self.expected_total_features), dtype=torch.float)
+
         return data

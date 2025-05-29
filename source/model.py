@@ -13,6 +13,7 @@ class NNConvNet(torch.nn.Module):
         edge_nn1 = torch.nn.Sequential(
             torch.nn.Linear(edge_feature_dim, hidden_dim),
             torch.nn.ReLU(),
+            torch.nn.Dropout(dropout),
             torch.nn.Linear(hidden_dim, hidden_channels * node_in_channels) # Or some other size
         )
         self.convs.append(NNConv(node_in_channels, hidden_channels, nn=edge_nn1, aggr='mean')) # or 'add', 'max'
@@ -23,6 +24,7 @@ class NNConvNet(torch.nn.Module):
             edge_nni = torch.nn.Sequential(
             torch.nn.Linear(edge_feature_dim, hidden_dim),
             torch.nn.ReLU(),
+            torch.nn.Dropout(dropout),
             torch.nn.Linear(hidden_dim, hidden_channels * current_dim)
             )
             self.convs.append(NNConv(current_dim, hidden_channels, nn=edge_nni, aggr='mean'))
@@ -41,6 +43,8 @@ class NNConvNet(torch.nn.Module):
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
         if x.dtype == torch.long: x = x.float()
         if edge_attr.dtype == torch.long: edge_attr = edge_attr.float()
+
+        edge_attr = F.dropout(edge_attr, p=self.dropout_val, training=self.training)
 
         for i in range(len(self.convs)):
             x = self.convs[i](x, edge_index, edge_attr)
