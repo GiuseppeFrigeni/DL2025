@@ -44,7 +44,7 @@ class NNConvNet(torch.nn.Module):
         if x.dtype == torch.long: x = x.float()
         if edge_attr.dtype == torch.long: edge_attr = edge_attr.float()
 
-        edge_attr = F.dropout(edge_attr, p=self.dropout_val, training=self.training)
+        edge_attr = F.dropout(edge_attr, p=0.2, training=self.training)
 
         for i in range(len(self.convs)):
             x = self.convs[i](x, edge_index, edge_attr)
